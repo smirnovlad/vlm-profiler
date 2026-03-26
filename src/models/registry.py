@@ -87,6 +87,7 @@ class LoadedModel:
     device: str
     dtype: torch.dtype
     optimization: str
+    gpu_index: int = 0
 
 
 def _get_model_class(model_name: str):
@@ -102,6 +103,7 @@ def load_model(
     model_name: str,
     device: str = "cuda",
     optimization: str = "none",
+    gpu_index: int = 0,
 ) -> LoadedModel:
     """Load a VLM with the specified optimization.
 
@@ -109,6 +111,7 @@ def load_model(
         model_name: HuggingFace model identifier
         device: 'cuda' or 'cpu'
         optimization: 'none', 'fp16', 'torch_compile', 'flash_attn2'
+        gpu_index: GPU device index (0 or 1) for multi-GPU setups
 
     Returns:
         LoadedModel with model, processor, and metadata
@@ -123,7 +126,8 @@ def load_model(
     }
 
     if not no_device_map:
-        model_kwargs["device_map"] = device if device == "cuda" else None
+        device_target = f"cuda:{gpu_index}" if device == "cuda" else None
+        model_kwargs["device_map"] = device_target
 
     dtype_key = "dtype" if uses_dtype_kwarg else "torch_dtype"
 
@@ -146,7 +150,7 @@ def load_model(
 
     # Models without device_map need explicit .to()
     if no_device_map and device == "cuda":
-        model = model.to("cuda")
+        model = model.to(f"cuda:{gpu_index}")
     elif device == "cpu":
         model = model.to("cpu")
 
@@ -167,4 +171,5 @@ def load_model(
         device=device,
         dtype=dtype,
         optimization=optimization,
+        gpu_index=gpu_index,
     )

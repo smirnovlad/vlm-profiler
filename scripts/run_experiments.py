@@ -89,6 +89,12 @@ def main():
         default=None,
         help="Wandb run name",
     )
+    parser.add_argument(
+        "--gpu-index",
+        type=int,
+        default=0,
+        help="GPU device index (default: 0)",
+    )
     args = parser.parse_args()
 
     # Build structured output directory
@@ -111,6 +117,7 @@ def main():
         models_filter=args.models,
         datasets_filter=args.datasets,
         devices_filter=args.devices,
+        gpu_index=args.gpu_index,
         wandb_project=args.wandb_project,
         wandb_entity=args.wandb_entity,
         wandb_run_name=args.wandb_run_name,
