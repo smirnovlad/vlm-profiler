@@ -72,15 +72,20 @@ def _log_to_wandb(result: dict[str, Any]):
         if result.get("energy"):
             log_data["energy/avg_power_w"] = result["energy"]["avg_power_w"]
             log_data["energy/max_power_w"] = result["energy"]["max_power_w"]
-            log_data["energy/energy_j"] = result["energy"]["energy_j"]
-            log_data["energy/duration_s"] = result["energy"]["duration_s"]
+            log_data["energy/per_inference_j"] = result["energy"].get("energy_per_inference_j", 0)
+            log_data["energy/total_j"] = result["energy"]["energy_j"]
         if result.get("quality"):
             log_data["quality/wer"] = result["quality"]["wer_score"]
             log_data["quality/exact_match"] = result["quality"]["exact_match_accuracy"]
             log_data["quality/num_samples"] = result["quality"]["num_samples"]
         if result.get("flops"):
             log_data["flops/total"] = result["flops"]["total_flops"]
+            log_data["flops/macs"] = result["flops"]["total_macs"]
             log_data["flops/params"] = result["flops"]["total_params"]
+            log_data["flops/method"] = result["flops"].get("method", "unknown")
+        if result.get("param_counts"):
+            for component, count in result["param_counts"].items():
+                log_data[f"params/{component}"] = count
 
     _wandb_run.log(log_data)
 
@@ -262,7 +267,7 @@ def run_single_experiment(
         )
         result["latency"] = asdict(latency)
 
-        # Energy
+        # Energy (per-inference: total energy / number of runs)
         if loaded.device == "cuda":
             monitor = EnergyMonitor(gpu_index=gpu_index)
             monitor.start()
@@ -270,21 +275,29 @@ def run_single_experiment(
                 with torch.no_grad():
                     _run_generate(loaded, inputs, image=first_img, prompt_text=first_prompt)
                 torch.cuda.synchronize()
-            energy = monitor.stop()
-            result["energy"] = asdict(energy)
+            energy_raw = monitor.stop()
+            energy_data = asdict(energy_raw)
+            energy_data["energy_per_inference_j"] = energy_raw.energy_j / timed_runs
+            energy_data["duration_per_inference_s"] = energy_raw.duration_s / timed_runs
+            energy_data["num_runs"] = timed_runs
+            result["energy"] = energy_data
         else:
             result["energy"] = None
 
-        # FLOPs (optional, run once)
+        # Parameter counts (always — cheap and needed for bottleneck analysis)
+        if not is_custom:
+            result["param_counts"] = count_parameters(loaded.model)
+        else:
+            result["param_counts"] = None
+
+        # FLOPs (optional, run once on baseline)
         if measure_flops and not is_custom and inputs:
             try:
                 flops_result = estimate_flops(loaded.model, inputs)
                 result["flops"] = asdict(flops_result)
-                result["param_counts"] = count_parameters(loaded.model)
             except Exception as e:
                 logger.warning("FLOPs estimation failed for %s: %s", exp_id, e)
                 result["flops"] = None
-                result["param_counts"] = count_parameters(loaded.model)
         else:
             result["flops"] = None
 
