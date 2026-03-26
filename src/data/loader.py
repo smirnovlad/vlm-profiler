@@ -54,7 +54,7 @@ def load_scienceqa(num_samples: int = 300) -> list[VLMSample]:
 def load_textvqa(num_samples: int = 300) -> list[VLMSample]:
     """Load TextVQA validation samples."""
     logger.info("Loading TextVQA...")
-    ds = load_dataset("textvqa", split="validation", cache_dir=str(CACHE_DIR))
+    ds = load_dataset("lmms-lab/textvqa", split="validation", cache_dir=str(CACHE_DIR))
 
     samples = []
     for idx, row in enumerate(ds):
@@ -83,7 +83,7 @@ def load_coco_captions(num_samples: int = 300) -> list[VLMSample]:
     """Load COCO Caption validation samples."""
     logger.info("Loading COCO Captions...")
     ds = load_dataset(
-        "HuggingFace/coco_captions", split="validation", cache_dir=str(CACHE_DIR)
+        "lmms-lab/COCO-Caption", split="val", cache_dir=str(CACHE_DIR)
     )
 
     samples = []
@@ -93,11 +93,11 @@ def load_coco_captions(num_samples: int = 300) -> list[VLMSample]:
         img = row.get("image")
         if img is None or not isinstance(img, Image.Image):
             continue
-        captions = row.get("captions", row.get("caption", []))
-        if isinstance(captions, list):
-            caption = captions[0] if captions else ""
+        raw_caption = row.get("answer", row.get("caption", ""))
+        if isinstance(raw_caption, list):
+            caption = raw_caption[0] if raw_caption else ""
         else:
-            caption = str(captions)
+            caption = str(raw_caption)
         samples.append(
             VLMSample(
                 image=img.convert("RGB"),

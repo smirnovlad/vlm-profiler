@@ -1,0 +1,33 @@
+models:
+  - llava-hf/llava-1.5-400m-fp16
+  - llava-hf/llava-1.5-13b-hf
+  - Salesforce/blip2-opt-2.7b
+  - Salesforce/instructblip-vicuna-7b
+  - Salesforce/instructblip-flan-t5-xl
+  - Salesforce/blip2-flan-t5-xl
+  - adept/fuyu-8b
+  - HuggingFaceM4/idefics2-8b
+
+datasets:
+  - name: scienceqa
+    source: derek-thomas/ScienceQA
+    split: validation
+    num_samples: 3
+
+baseline:
+  resolution: 224
+  prompt_length: 10
+  batch_size: 1
+  optimization: none
+  device: cuda
+
+scaling:
+  resolutions: [224]
+  prompt_lengths: [10]
+  devices: ["cuda"]
+  optimizations: ["none"]
+  batch_sizes: [1]
+
+profiling:
+  warmup_runs: 1
+  timed_runs: 2

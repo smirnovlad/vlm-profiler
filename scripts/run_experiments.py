@@ -1,5 +1,15 @@
 #!/usr/bin/env python3
-"""CLI entry point for running VLM profiling experiments."""
+"""CLI entry point for running VLM profiling experiments.
+
+Usage:
+    # Run one model on GPU 0 (13 experiments per dataset)
+    python scripts/run_experiments.py --model Salesforce/blip2-opt-2.7b --gpu-index 0
+
+    # Run another model on GPU 1 in parallel
+    python scripts/run_experiments.py --model llava-hf/llava-1.5-13b-hf --gpu-index 1
+
+Output: outputs/{date}/{model_short_name}/{time}/
+"""
 
 import argparse
 import logging
@@ -7,19 +17,23 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
-# Add project root to path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from src.runner import run_experiments
 from src.utils import kill_my_gpu_processes, setup_logging
 
 
-def build_output_dir(base: str, exp_name: str) -> Path:
-    """Build output path: {base}/{date}/{exp_name}/{time}."""
+def model_short_name(model_id: str) -> str:
+    """Extract short name from HF model id: 'Salesforce/blip2-opt-2.7b' -> 'blip2-opt-2.7b'."""
+    return model_id.split("/")[-1]
+
+
+def build_output_dir(base: str, model_id: str) -> Path:
+    """Build output path: {base}/{date}/{model_short_name}/{time}."""
     now = datetime.now()
     date_str = now.strftime("%Y-%m-%d")
     time_str = now.strftime("%H-%M-%S")
-    return Path(base) / date_str / exp_name / time_str
+    return Path(base) / date_str / model_short_name(model_id) / time_str
 
 
 def setup_file_logging(output_dir: Path):
@@ -37,6 +51,11 @@ def setup_file_logging(output_dir: Path):
 def main():
     parser = argparse.ArgumentParser(description="Run VLM profiling experiments")
     parser.add_argument(
+        "--model",
+        required=True,
+        help="HuggingFace model id to profile (e.g. Salesforce/blip2-opt-2.7b)",
+    )
+    parser.add_argument(
         "--config",
         default="configs/experiment_config.yaml",
         help="Path to experiment config YAML",
@@ -45,17 +64,6 @@ def main():
         "--output-base",
         default="outputs",
         help="Base directory for outputs (default: outputs)",
-    )
-    parser.add_argument(
-        "--exp-name",
-        default="default",
-        help="Experiment name (used in output path)",
-    )
-    parser.add_argument(
-        "--models",
-        nargs="+",
-        default=None,
-        help="Filter: only run these models",
     )
     parser.add_argument(
         "--datasets",
@@ -68,6 +76,12 @@ def main():
         nargs="+",
         default=None,
         help="Filter: only run on these devices (cuda, cpu)",
+    )
+    parser.add_argument(
+        "--gpu-index",
+        type=int,
+        default=0,
+        help="GPU device index (default: 0)",
     )
     parser.add_argument(
         "--free-gpus",
@@ -87,18 +101,11 @@ def main():
     parser.add_argument(
         "--wandb-run-name",
         default=None,
-        help="Wandb run name",
-    )
-    parser.add_argument(
-        "--gpu-index",
-        type=int,
-        default=0,
-        help="GPU device index (default: 0)",
+        help="Wandb run name (defaults to model short name)",
     )
     args = parser.parse_args()
 
-    # Build structured output directory
-    output_dir = build_output_dir(args.output_base, args.exp_name)
+    output_dir = build_output_dir(args.output_base, args.model)
     results_dir = output_dir / "results"
     results_dir.mkdir(parents=True, exist_ok=True)
 
@@ -106,21 +113,24 @@ def main():
     setup_file_logging(output_dir)
 
     logger = logging.getLogger(__name__)
+    logger.info("Model: %s", args.model)
     logger.info("Output directory: %s", output_dir)
 
     if args.free_gpus:
         kill_my_gpu_processes()
 
+    wandb_run_name = args.wandb_run_name or model_short_name(args.model)
+
     run_experiments(
         config_path=args.config,
         results_dir=str(results_dir),
-        models_filter=args.models,
+        models_filter=[args.model],
         datasets_filter=args.datasets,
         devices_filter=args.devices,
         gpu_index=args.gpu_index,
         wandb_project=args.wandb_project,
         wandb_entity=args.wandb_entity,
-        wandb_run_name=args.wandb_run_name,
+        wandb_run_name=wandb_run_name,
     )
 
     logger.info("All results saved to: %s", output_dir)
