@@ -78,6 +78,11 @@ NO_DEVICE_MAP_MODELS = {
     "vikhyatk/moondream2",
 }
 
+# Models that should always load in FP16 (too large for FP32 on 48GB GPU)
+FP16_DEFAULT_MODELS = {
+    "llava-hf/llava-1.5-13b-hf",
+}
+
 
 @dataclass
 class LoadedModel:
@@ -131,7 +136,9 @@ def load_model(
 
     dtype_key = "dtype" if uses_dtype_kwarg else "torch_dtype"
 
-    if optimization == "fp16":
+    force_fp16 = model_name in FP16_DEFAULT_MODELS
+
+    if optimization == "fp16" or force_fp16:
         dtype = torch.float16
         model_kwargs[dtype_key] = torch.float16
     elif optimization == "flash_attn2":
