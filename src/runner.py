@@ -11,7 +11,7 @@ import torch
 import yaml
 
 from src.data.loader import VLMSample, load_dataset_by_name
-from src.data.preprocessing import generate_prompt, resize_image
+from src.data.preprocessing import format_prompt_for_model, generate_prompt, resize_image
 from src.models.registry import LoadedModel, load_model
 from src.profiling.energy import EnergyMonitor
 from src.profiling.flops import count_parameters, estimate_flops
@@ -128,7 +128,10 @@ def _prepare_batch(
     """Prepare a batch of inputs for the model."""
     batch_samples = samples[:batch_size]
     images = [resize_image(s.image, resolution) for s in batch_samples]
-    prompts = [generate_prompt(s.question, prompt_length) for s in batch_samples]
+    prompts = [
+        format_prompt_for_model(generate_prompt(s.question, prompt_length), loaded.model_name)
+        for s in batch_samples
+    ]
 
     if batch_size == 1:
         inputs = loaded.processor(
@@ -139,6 +142,11 @@ def _prepare_batch(
         inputs = loaded.processor(
             images=images, text=prompts, return_tensors="pt", padding=True
         )
+
+    # Fix 5D pixel_values (some processors add an extra dim)
+    if "pixel_values" in inputs and hasattr(inputs["pixel_values"], "dim"):
+        if inputs["pixel_values"].dim() == 5 and inputs["pixel_values"].shape[1] == 1:
+            inputs["pixel_values"] = inputs["pixel_values"].squeeze(1)
 
     device_str = f"cuda:{loaded.gpu_index}" if loaded.device == "cuda" else "cpu"
     inputs = {k: v.to(device_str) if hasattr(v, "to") else v for k, v in inputs.items()}
@@ -232,7 +240,9 @@ def run_single_experiment(
             return result
 
         first_img = resize_image(samples[0].image, resolution)
-        first_prompt = generate_prompt(samples[0].question, prompt_length)
+        first_prompt = format_prompt_for_model(
+            generate_prompt(samples[0].question, prompt_length), loaded.model_name
+        )
 
         if is_custom:
             inputs = {}
@@ -288,11 +298,16 @@ def run_single_experiment(
             references = []
             for sample in eval_samples:
                 img = resize_image(sample.image, resolution)
-                prompt = generate_prompt(sample.question, prompt_length)
+                prompt = format_prompt_for_model(
+                    generate_prompt(sample.question, prompt_length), loaded.model_name
+                )
                 if is_custom:
                     inp = {}
                 else:
                     inp = loaded.processor(images=img, text=prompt, return_tensors="pt")
+                    if "pixel_values" in inp and hasattr(inp["pixel_values"], "dim"):
+                        if inp["pixel_values"].dim() == 5 and inp["pixel_values"].shape[1] == 1:
+                            inp["pixel_values"] = inp["pixel_values"].squeeze(1)
                     device_str = f"cuda:{gpu_index}" if loaded.device == "cuda" else "cpu"
                     inp = {k: v.to(device_str) if hasattr(v, "to") else v for k, v in inp.items()}
                 with torch.no_grad():

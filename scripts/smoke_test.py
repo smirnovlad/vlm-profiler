@@ -10,10 +10,11 @@ from PIL import Image
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from src.data.preprocessing import format_prompt_for_model
 from src.models.registry import load_model
 
 MODELS = [
-    "llava-hf/llava-1.5-400m-fp16",
+    "llava-hf/llava-1.5-7b-hf",
     "llava-hf/llava-1.5-13b-hf",
     "Salesforce/blip2-opt-2.7b",
     "Salesforce/instructblip-vicuna-7b",
@@ -25,7 +26,7 @@ MODELS = [
 
 # Dummy 224x224 red image
 DUMMY_IMAGE = Image.new("RGB", (224, 224), color=(255, 0, 0))
-DUMMY_PROMPT = "What is in this image?"
+BASE_PROMPT = "What is in this image?"
 
 
 def smoke_test_model(model_name: str, gpu_index: int = 0):
@@ -43,8 +44,13 @@ def smoke_test_model(model_name: str, gpu_index: int = 0):
 
     # Process inputs
     try:
-        inputs = loaded.processor(images=DUMMY_IMAGE, text=DUMMY_PROMPT, return_tensors="pt")
+        prompt = format_prompt_for_model(BASE_PROMPT, model_name)
+        inputs = loaded.processor(images=DUMMY_IMAGE, text=prompt, return_tensors="pt")
         device_str = f"cuda:{gpu_index}"
+        # Fix 5D pixel_values
+        if "pixel_values" in inputs and hasattr(inputs["pixel_values"], "dim"):
+            if inputs["pixel_values"].dim() == 5 and inputs["pixel_values"].shape[1] == 1:
+                inputs["pixel_values"] = inputs["pixel_values"].squeeze(1)
         inputs = {k: v.to(device_str) if hasattr(v, "to") else v for k, v in inputs.items()}
         print(f"  [OK] Processor produced keys: {list(inputs.keys())}")
     except Exception as e:

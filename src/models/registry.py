@@ -50,7 +50,7 @@ MODEL_CLASS_OVERRIDES: dict[str, tuple[str, str]] = {
         "transformers",
         "InstructBlipForConditionalGeneration",
     ),
-    "llava-hf/llava-1.5-400m-fp16": (
+    "llava-hf/llava-1.5-7b-hf": (
         "transformers",
         "LlavaForConditionalGeneration",
     ),

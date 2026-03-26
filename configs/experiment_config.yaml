@@ -1,5 +1,5 @@
 models:
-  - llava-hf/llava-1.5-400m-fp16
+  - llava-hf/llava-1.5-7b-hf
   - llava-hf/llava-1.5-13b-hf
   - Salesforce/blip2-opt-2.7b
   - Salesforce/instructblip-vicuna-7b

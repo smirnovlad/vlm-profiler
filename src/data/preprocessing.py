@@ -2,10 +2,25 @@
 
 from PIL import Image
 
+# Model-specific prompt templates. {question} is replaced with the actual question.
+PROMPT_TEMPLATES: dict[str, str] = {
+    "llava-hf/llava-1.5-7b-hf": "USER: <image>\n{question}\nASSISTANT:",
+    "llava-hf/llava-1.5-13b-hf": "USER: <image>\n{question}\nASSISTANT:",
+    "HuggingFaceM4/idefics2-8b": "User:<image>{question}<end_of_utterance>\nAssistant:",
+}
+
 
 def resize_image(image: Image.Image, resolution: int) -> Image.Image:
     """Resize image to resolution x resolution, preserving RGB mode."""
     return image.resize((resolution, resolution), Image.LANCZOS)
+
+
+def format_prompt_for_model(prompt: str, model_name: str) -> str:
+    """Wrap prompt in model-specific template if needed."""
+    template = PROMPT_TEMPLATES.get(model_name)
+    if template:
+        return template.format(question=prompt)
+    return prompt
 
 
 def generate_prompt(base_question: str, target_token_count: int) -> str:
