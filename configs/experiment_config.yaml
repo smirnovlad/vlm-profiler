@@ -1,0 +1,45 @@
+models:
+  - llava-hf/llava-1.5-400m-fp16
+  - llava-hf/llava-1.5-13b-hf
+  - Salesforce/blip2-opt-2.7b
+  - Salesforce/instructblip-vicuna-7b
+  - Salesforce/instructblip-flan-t5-xl
+  - Salesforce/blip2-flan-t5-xl
+  - adept/fuyu-8b
+  - THUDM/cogagent-vqa-hf
+  - vikhyatk/moondream2
+  - HuggingFaceM4/idefics2-8b
+
+datasets:
+  - name: scienceqa
+    source: derek-thomas/ScienceQA
+    split: validation
+    num_samples: 300
+  - name: textvqa
+    source: textvqa
+    split: validation
+    num_samples: 300
+  - name: coco_caption
+    source: HuggingFace/coco_captions
+    split: validation
+    num_samples: 300
+
+scaling:
+  resolutions: [224, 336, 448, 512]
+  prompt_lengths: [10, 50, 100, 200]
+  devices: ["cuda", "cpu"]
+  optimizations: ["none", "fp16", "torch_compile", "flash_attn2"]
+  batch_sizes: [1, 2, 4, 8]
+
+profiling:
+  warmup_runs: 3
+  timed_runs: 10
+  energy_poll_interval_ms: 100
+
+invalid_combos:
+  - device: cpu
+    optimization: fp16
+  - device: cpu
+    optimization: flash_attn2
+  - device: cpu
+    optimization: torch_compile
