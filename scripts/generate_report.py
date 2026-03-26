@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Aggregate experiment results and generate charts + markdown report."""
 
+import argparse
 import json
 import sys
 from pathlib import Path
@@ -10,14 +11,11 @@ import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-RESULTS_DIR = Path("results")
-REPORTS_DIR = Path("reports")
 
-
-def load_results() -> pd.DataFrame:
+def load_results(results_dir: Path) -> pd.DataFrame:
     """Load all JSON result files into a DataFrame."""
     records = []
-    for f in RESULTS_DIR.glob("*.json"):
+    for f in results_dir.glob("*.json"):
         try:
             data = json.loads(f.read_text())
             if data.get("status") != "success":
@@ -227,22 +225,34 @@ def generate_markdown_report(df: pd.DataFrame, out_dir: Path):
 
 
 def main():
-    REPORTS_DIR.mkdir(parents=True, exist_ok=True)
-    df = load_results()
+    parser = argparse.ArgumentParser(description="Generate report from experiment results")
+    parser.add_argument(
+        "--output-dir",
+        required=True,
+        help="Experiment output directory (e.g. outputs/2026-03-26/exp_name/12-00-07)",
+    )
+    args = parser.parse_args()
+
+    output_dir = Path(args.output_dir)
+    results_dir = output_dir / "results"
+    reports_dir = output_dir / "reports"
+    reports_dir.mkdir(parents=True, exist_ok=True)
+
+    df = load_results(results_dir)
     if df.empty:
-        print("No successful results found in", RESULTS_DIR)
+        print("No successful results found in", results_dir)
         return
 
     print(f"Loaded {len(df)} successful experiment results.")
 
-    plot_latency_vs_resolution(df, REPORTS_DIR)
-    plot_latency_vs_batch(df, REPORTS_DIR)
-    plot_optimization_speedup(df, REPORTS_DIR)
-    plot_quality_vs_latency(df, REPORTS_DIR)
-    plot_energy_comparison(df, REPORTS_DIR)
-    generate_markdown_report(df, REPORTS_DIR)
+    plot_latency_vs_resolution(df, reports_dir)
+    plot_latency_vs_batch(df, reports_dir)
+    plot_optimization_speedup(df, reports_dir)
+    plot_quality_vs_latency(df, reports_dir)
+    plot_energy_comparison(df, reports_dir)
+    generate_markdown_report(df, reports_dir)
 
-    print(f"Report generated at {REPORTS_DIR / 'REPORT.md'}")
+    print(f"Report generated at {reports_dir / 'REPORT.md'}")
 
 
 if __name__ == "__main__":
