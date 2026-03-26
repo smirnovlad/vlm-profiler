@@ -1,11 +1,26 @@
 """Model registry: unified interface to load and configure VLMs."""
 
+import importlib
 import logging
 from dataclasses import dataclass
 from typing import Any
 
 import torch
+import torch.nn as nn
 from transformers import AutoModelForCausalLM, AutoProcessor
+
+# Patch Module.__getattr__ to handle missing all_tied_weights_keys
+# (needed for models with custom remote code on transformers 5.x)
+_orig_module_getattr = nn.Module.__getattr__
+
+
+def _patched_module_getattr(self, name: str):
+    if name == "all_tied_weights_keys":
+        return getattr(self, "_tied_weights_keys", {}) or {}
+    return _orig_module_getattr(self, name)
+
+
+nn.Module.__getattr__ = _patched_module_getattr
 
 logger = logging.getLogger(__name__)
 
@@ -53,6 +68,16 @@ MODEL_CLASS_OVERRIDES: dict[str, tuple[str, str]] = {
     ),
 }
 
+# Models that use 'dtype' kwarg instead of 'torch_dtype'
+DTYPE_KWARG_MODELS = {
+    "vikhyatk/moondream2",
+}
+
+# Models that don't support device_map and need explicit .to(device)
+NO_DEVICE_MAP_MODELS = {
+    "vikhyatk/moondream2",
+}
+
 
 @dataclass
 class LoadedModel:
@@ -68,8 +93,6 @@ def _get_model_class(model_name: str):
     """Get the correct model class for a given model."""
     if model_name in MODEL_CLASS_OVERRIDES:
         module_name, class_name = MODEL_CLASS_OVERRIDES[model_name]
-        import importlib
-
         module = importlib.import_module(module_name)
         return getattr(module, class_name)
     return AutoModelForCausalLM
@@ -92,21 +115,27 @@ def load_model(
     """
     trust_remote = model_name in TRUST_REMOTE_CODE_MODELS
     dtype = torch.float32
+    uses_dtype_kwarg = model_name in DTYPE_KWARG_MODELS
+    no_device_map = model_name in NO_DEVICE_MAP_MODELS
 
     model_kwargs: dict[str, Any] = {
         "trust_remote_code": trust_remote,
-        "device_map": device if device == "cuda" else None,
     }
+
+    if not no_device_map:
+        model_kwargs["device_map"] = device if device == "cuda" else None
+
+    dtype_key = "dtype" if uses_dtype_kwarg else "torch_dtype"
 
     if optimization == "fp16":
         dtype = torch.float16
-        model_kwargs["torch_dtype"] = torch.float16
+        model_kwargs[dtype_key] = torch.float16
     elif optimization == "flash_attn2":
         dtype = torch.float16
-        model_kwargs["torch_dtype"] = torch.float16
+        model_kwargs[dtype_key] = torch.float16
         model_kwargs["attn_implementation"] = "flash_attention_2"
     else:
-        model_kwargs["torch_dtype"] = torch.float32
+        model_kwargs[dtype_key] = torch.float32
 
     logger.info(
         "Loading model=%s, device=%s, opt=%s", model_name, device, optimization
@@ -115,7 +144,10 @@ def load_model(
     model_class = _get_model_class(model_name)
     model = model_class.from_pretrained(model_name, **model_kwargs)
 
-    if device == "cpu":
+    # Models without device_map need explicit .to()
+    if no_device_map and device == "cuda":
+        model = model.to("cuda")
+    elif device == "cpu":
         model = model.to("cpu")
 
     if optimization == "torch_compile":

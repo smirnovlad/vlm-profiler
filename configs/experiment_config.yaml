@@ -6,8 +6,8 @@ models:
   - Salesforce/instructblip-flan-t5-xl
   - Salesforce/blip2-flan-t5-xl
   - adept/fuyu-8b
-  - THUDM/cogagent-vqa-hf
-  - vikhyatk/moondream2
+  # - THUDM/cogagent-vqa-hf    # requires custom handler, skip for now
+  # - vikhyatk/moondream2       # non-standard generate() API, skip for now
   - HuggingFaceM4/idefics2-8b
 
 datasets:

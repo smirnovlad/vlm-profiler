@@ -47,6 +47,21 @@ def main():
         action="store_true",
         help="Kill own GPU processes before starting",
     )
+    parser.add_argument(
+        "--wandb-project",
+        default=None,
+        help="Wandb project name (enables wandb logging)",
+    )
+    parser.add_argument(
+        "--wandb-entity",
+        default=None,
+        help="Wandb entity (team/org)",
+    )
+    parser.add_argument(
+        "--wandb-run-name",
+        default=None,
+        help="Wandb run name",
+    )
     args = parser.parse_args()
 
     setup_logging()
@@ -60,6 +75,9 @@ def main():
         models_filter=args.models,
         datasets_filter=args.datasets,
         devices_filter=args.devices,
+        wandb_project=args.wandb_project,
+        wandb_entity=args.wandb_entity,
+        wandb_run_name=args.wandb_run_name,
     )
 
 

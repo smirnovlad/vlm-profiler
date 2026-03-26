@@ -1,0 +1,29 @@
+models:
+  - Salesforce/blip2-opt-2.7b
+  - Salesforce/blip2-flan-t5-xl
+
+datasets:
+  - name: scienceqa
+    source: derek-thomas/ScienceQA
+    split: validation
+    num_samples: 10
+
+scaling:
+  resolutions: [224, 336]
+  prompt_lengths: [10, 50]
+  devices: ["cuda"]
+  optimizations: ["none", "fp16"]
+  batch_sizes: [1, 2]
+
+profiling:
+  warmup_runs: 2
+  timed_runs: 5
+  energy_poll_interval_ms: 100
+
+invalid_combos:
+  - device: cpu
+    optimization: fp16
+  - device: cpu
+    optimization: flash_attn2
+  - device: cpu
+    optimization: torch_compile
