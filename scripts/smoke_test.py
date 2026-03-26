@@ -49,7 +49,7 @@ def smoke_test_model(model_name: str, gpu_index: int = 0):
         device_str = f"cuda:{gpu_index}"
         # Fix 5D pixel_values
         if "pixel_values" in inputs and hasattr(inputs["pixel_values"], "dim"):
-            if inputs["pixel_values"].dim() == 5 and inputs["pixel_values"].shape[1] == 1:
+            if inputs["pixel_values"].dim() == 5:
                 inputs["pixel_values"] = inputs["pixel_values"].squeeze(1)
         inputs = {k: v.to(device_str) if hasattr(v, "to") else v for k, v in inputs.items()}
         print(f"  [OK] Processor produced keys: {list(inputs.keys())}")

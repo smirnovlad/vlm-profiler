@@ -150,7 +150,7 @@ def _prepare_batch(
 
     # Fix 5D pixel_values (some processors add an extra dim)
     if "pixel_values" in inputs and hasattr(inputs["pixel_values"], "dim"):
-        if inputs["pixel_values"].dim() == 5 and inputs["pixel_values"].shape[1] == 1:
+        if inputs["pixel_values"].dim() == 5:
             inputs["pixel_values"] = inputs["pixel_values"].squeeze(1)
 
     device_str = f"cuda:{loaded.gpu_index}" if loaded.device == "cuda" else "cpu"
