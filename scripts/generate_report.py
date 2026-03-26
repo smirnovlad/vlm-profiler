@@ -99,9 +99,10 @@ def plot_latency_vs_resolution(df: pd.DataFrame, out_dir: Path):
     ]
     if subset.empty:
         return
+    avg = subset.groupby(["model_short", "resolution"])["latency_mean_ms"].mean().reset_index()
     fig, ax = plt.subplots(figsize=(12, 6))
-    for model in sorted(subset["model_short"].unique()):
-        mdata = subset[subset["model_short"] == model].sort_values("resolution")
+    for model in sorted(avg["model_short"].unique()):
+        mdata = avg[avg["model_short"] == model].sort_values("resolution")
         ax.plot(mdata["resolution"], mdata["latency_mean_ms"], marker="o", label=model)
     ax.set_xlabel("Image Resolution")
     ax.set_ylabel("Latency (ms)")
@@ -119,9 +120,10 @@ def plot_latency_vs_prompt_length(df: pd.DataFrame, out_dir: Path):
     ]
     if subset.empty:
         return
+    avg = subset.groupby(["model_short", "prompt_length"])["latency_mean_ms"].mean().reset_index()
     fig, ax = plt.subplots(figsize=(12, 6))
-    for model in sorted(subset["model_short"].unique()):
-        mdata = subset[subset["model_short"] == model].sort_values("prompt_length")
+    for model in sorted(avg["model_short"].unique()):
+        mdata = avg[avg["model_short"] == model].sort_values("prompt_length")
         ax.plot(mdata["prompt_length"], mdata["latency_mean_ms"], marker="s", label=model)
     ax.set_xlabel("Prompt Length (tokens)")
     ax.set_ylabel("Latency (ms)")
@@ -139,9 +141,10 @@ def plot_latency_vs_batch(df: pd.DataFrame, out_dir: Path):
     ]
     if subset.empty:
         return
+    avg = subset.groupby(["model_short", "batch_size"])["latency_mean_ms"].mean().reset_index()
     fig, ax = plt.subplots(figsize=(12, 6))
-    for model in sorted(subset["model_short"].unique()):
-        mdata = subset[subset["model_short"] == model].sort_values("batch_size")
+    for model in sorted(avg["model_short"].unique()):
+        mdata = avg[avg["model_short"] == model].sort_values("batch_size")
         ax.plot(mdata["batch_size"], mdata["latency_mean_ms"], marker="s", label=model)
     ax.set_xlabel("Batch Size")
     ax.set_ylabel("Latency (ms)")
@@ -153,7 +156,7 @@ def plot_latency_vs_batch(df: pd.DataFrame, out_dir: Path):
 
 
 def plot_optimization_speedup(df: pd.DataFrame, out_dir: Path):
-    base = _baseline_filter(df).set_index("model_short")["latency_mean_ms"]
+    base = _baseline_filter(df).groupby("model_short")["latency_mean_ms"].mean()
     if base.empty:
         return
     fig, ax = plt.subplots(figsize=(12, 6))
@@ -165,8 +168,8 @@ def plot_optimization_speedup(df: pd.DataFrame, out_dir: Path):
             (df["optimization"] == opt) & (df["batch_size"] == 1)
             & (df["device"] == "cuda") & (df["resolution"] == 224)
             & (df["prompt_length"] == 10)
-        ].set_index("model_short")["latency_mean_ms"]
-        speedups = [base.get(m, None) / opt_data.get(m, None) if m in opt_data else 0 for m in models]
+        ].groupby("model_short")["latency_mean_ms"].mean()
+        speedups = [float(base[m] / opt_data[m]) if m in opt_data else 0.0 for m in models]
         ax.bar(x + i * width, speedups, width, label=opt, alpha=0.8)
     ax.axhline(y=1.0, color="gray", linestyle="--", alpha=0.5)
     ax.set_ylabel("Speedup (vs baseline)")
@@ -183,9 +186,9 @@ def plot_energy_comparison(df: pd.DataFrame, out_dir: Path):
     subset = _baseline_filter(df).dropna(subset=["energy_per_inf_j"])
     if subset.empty:
         return
-    subset = subset.sort_values("energy_per_inf_j")
+    avg = subset.groupby("model_short")["energy_per_inf_j"].mean().sort_values()
     fig, ax = plt.subplots(figsize=(12, 6))
-    ax.barh(subset["model_short"], subset["energy_per_inf_j"])
+    ax.barh(avg.index, avg.values)
     ax.set_xlabel("Energy per Inference (J)")
     ax.set_title("Energy Consumption per Inference (batch=1, res=224, GPU)")
     plt.tight_layout()
@@ -200,9 +203,10 @@ def plot_energy_vs_resolution(df: pd.DataFrame, out_dir: Path):
     ].dropna(subset=["energy_per_inf_j"])
     if subset.empty:
         return
+    avg = subset.groupby(["model_short", "resolution"])["energy_per_inf_j"].mean().reset_index()
     fig, ax = plt.subplots(figsize=(12, 6))
-    for model in sorted(subset["model_short"].unique()):
-        mdata = subset[subset["model_short"] == model].sort_values("resolution")
+    for model in sorted(avg["model_short"].unique()):
+        mdata = avg[avg["model_short"] == model].sort_values("resolution")
         ax.plot(mdata["resolution"], mdata["energy_per_inf_j"], marker="o", label=model)
     ax.set_xlabel("Image Resolution")
     ax.set_ylabel("Energy per Inference (J)")
@@ -267,11 +271,11 @@ def plot_cpu_vs_gpu(df: pd.DataFrame, out_dir: Path):
     gpu = df[
         (df["device"] == "cuda") & (df["optimization"] == "none")
         & (df["batch_size"] == 1) & (df["resolution"] == 224) & (df["prompt_length"] == 10)
-    ].set_index("model_short")["latency_mean_ms"]
+    ].groupby("model_short")["latency_mean_ms"].mean()
     cpu = df[
         (df["device"] == "cpu") & (df["optimization"] == "none")
         & (df["batch_size"] == 1) & (df["resolution"] == 224) & (df["prompt_length"] == 10)
-    ].set_index("model_short")["latency_mean_ms"]
+    ].groupby("model_short")["latency_mean_ms"].mean()
     if gpu.empty or cpu.empty:
         return
     common = sorted(set(gpu.index) & set(cpu.index))
@@ -279,8 +283,8 @@ def plot_cpu_vs_gpu(df: pd.DataFrame, out_dir: Path):
         return
     fig, ax = plt.subplots(figsize=(12, 6))
     x = np.arange(len(common))
-    ax.bar(x - 0.2, [gpu[m] for m in common], 0.4, label="GPU", color="tab:blue")
-    ax.bar(x + 0.2, [cpu[m] for m in common], 0.4, label="CPU", color="tab:orange")
+    ax.bar(x - 0.2, [float(gpu[m]) for m in common], 0.4, label="GPU", color="tab:blue")
+    ax.bar(x + 0.2, [float(cpu[m]) for m in common], 0.4, label="CPU", color="tab:orange")
     ax.set_xticks(x)
     ax.set_xticklabels(common, rotation=45, ha="right")
     ax.set_ylabel("Latency (ms)")
