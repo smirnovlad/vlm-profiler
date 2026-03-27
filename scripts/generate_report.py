@@ -241,14 +241,84 @@ def plot_quality_vs_latency(df: pd.DataFrame, out_dir: Path):
     subset = _baseline_filter(df).dropna(subset=["wer"])
     if subset.empty:
         return
-    fig, ax = plt.subplots(figsize=(10, 8))
+
+    # Average WER and latency across datasets per model
+    avg = (
+        subset.groupby("model_short")
+        .agg(latency=("latency_mean_ms", "mean"), wer=("wer", "mean"))
+        .reset_index()
+    )
+
+    # Assign consistent colors per model
+    models_sorted = avg.sort_values("latency")["model_short"].tolist()
+    cmap = plt.cm.get_cmap("tab10", len(models_sorted))
+    color_map = {m: cmap(i) for i, m in enumerate(models_sorted)}
+
+    fig, ax = plt.subplots(figsize=(10, 7))
+
+    # Plot per-dataset points (small, transparent) and avg points (large)
+    dataset_markers = {"scienceqa": "^", "textvqa": "s", "coco_caption": "D"}
     for _, row in subset.iterrows():
-        ax.scatter(row["latency_mean_ms"], row["wer"], s=100)
-        ax.annotate(row["model_short"], (row["latency_mean_ms"], row["wer"]),
-                     fontsize=7, ha="left", va="bottom")
-    ax.set_xlabel("Latency (ms)")
-    ax.set_ylabel("WER (lower is better)")
-    ax.set_title("Quality (WER) vs Latency — Pareto Frontier")
+        m = row["model_short"]
+        ds = row["dataset"]
+        marker = dataset_markers.get(ds, "o")
+        ax.scatter(
+            row["latency_mean_ms"], row["wer"],
+            s=40, alpha=0.35, color=color_map[m], marker=marker,
+            edgecolors="none",
+        )
+
+    # Plot averaged points (one per model) with labels
+    for _, row in avg.iterrows():
+        m = row["model_short"]
+        ax.scatter(
+            row["latency"], row["wer"],
+            s=180, color=color_map[m], edgecolors="black", linewidths=0.8,
+            zorder=5, label=m,
+        )
+
+    # Labels with manual offsets for readability
+    label_offsets = {
+        "blip2-flan-t5-xl": (-5, -14),
+        "blip2-opt-2.7b": (8, 6),
+        "instructblip-flan-t5-xl": (8, -14),
+        "fuyu-8b": (-60, -14),
+        "llava-1.5-7b-hf": (8, -14),
+        "llava-1.5-13b-hf": (8, 8),
+        "instructblip-vicuna-7b": (8, -14),
+    }
+    for _, row in avg.iterrows():
+        m = row["model_short"]
+        ox, oy = label_offsets.get(m, (8, 4))
+        ax.annotate(
+            m,
+            (row["latency"], row["wer"]),
+            fontsize=8, fontweight="bold",
+            xytext=(ox, oy), textcoords="offset points",
+        )
+
+    # Pareto frontier (lower-left is better for both axes)
+    pareto = avg.sort_values("latency")
+    frontier = []
+    best_wer = float("inf")
+    for _, row in pareto.iterrows():
+        if row["wer"] < best_wer:
+            frontier.append(row)
+            best_wer = row["wer"]
+    if len(frontier) > 1:
+        fx = [r["latency"] for r in frontier]
+        fy = [r["wer"] for r in frontier]
+        ax.plot(fx, fy, "--", color="gray", alpha=0.5, linewidth=1.5, label="Pareto frontier")
+
+    # Dataset marker legend
+    for ds, marker in dataset_markers.items():
+        ax.scatter([], [], marker=marker, s=40, color="gray", alpha=0.5, label=f"  {ds}")
+
+    ax.set_xlabel("Latency (ms)", fontsize=11)
+    ax.set_ylabel("WER (lower is better)", fontsize=11)
+    ax.set_title("Quality (WER) vs Latency", fontsize=13)
+    ax.set_ylim(bottom=0)
+    ax.legend(fontsize=8, loc="upper left", framealpha=0.9)
     plt.tight_layout()
     fig.savefig(out_dir / "quality_vs_latency.png", dpi=150)
     plt.close(fig)
