@@ -17,6 +17,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
+plt.rcParams["axes.grid"] = True
+plt.rcParams["grid.alpha"] = 0.3
+
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 
