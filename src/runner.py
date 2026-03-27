@@ -148,10 +148,20 @@ def _prepare_batch(
             images=images, text=prompts, return_tensors="pt", padding=True
         )
 
-    # Fix 5D pixel_values (some processors add an extra dim)
+    # Fix 5D pixel_values (some processors produce [1, N, C, H, W] or [B, 1, C, H, W])
     if "pixel_values" in inputs and hasattr(inputs["pixel_values"], "dim"):
         if inputs["pixel_values"].dim() == 5:
-            inputs["pixel_values"] = inputs["pixel_values"].squeeze(1)
+            # Reshape [1, N, C, H, W] -> [N, C, H, W] or [B, 1, C, H, W] -> [B, C, H, W]
+            pv = inputs["pixel_values"]
+            if pv.shape[0] == 1 and pv.shape[1] == batch_size:
+                # Processor packed as [1, batch, C, H, W]
+                inputs["pixel_values"] = pv.squeeze(0)
+            elif pv.shape[1] == 1:
+                # Processor added extra dim [B, 1, C, H, W]
+                inputs["pixel_values"] = pv.squeeze(1)
+            else:
+                # Fallback: just squeeze any singleton dim
+                inputs["pixel_values"] = pv.reshape(-1, *pv.shape[2:])
 
     device_str = f"cuda:{loaded.gpu_index}" if loaded.device == "cuda" else "cpu"
     inputs = {k: v.to(device_str) if hasattr(v, "to") else v for k, v in inputs.items()}
