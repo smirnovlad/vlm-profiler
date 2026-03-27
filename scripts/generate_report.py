@@ -247,12 +247,24 @@ def plot_flops_comparison(df: pd.DataFrame, out_dir: Path):
     subset = subset[subset["flops"] > 0]
     if subset.empty:
         return
-    subset = subset.sort_values("flops")
+    avg = subset.groupby("model_short").agg({"flops": "mean", "flops_method": "first"}).reset_index()
+    avg = avg.sort_values("flops")
+    colors = ["tab:blue" if m == "calflops" else "tab:orange" for m in avg["flops_method"]]
     fig, ax = plt.subplots(figsize=(12, 6))
-    ax.barh(subset["model_short"], subset["flops"] / 1e9)
+    bars = ax.barh(avg["model_short"], avg["flops"] / 1e9, color=colors)
     ax.set_xlabel("GFLOPs")
     ax.set_title("FLOPs per Inference (batch=1, res=224)")
-    plt.tight_layout()
+    from matplotlib.patches import Patch
+    ax.legend(handles=[
+        Patch(color="tab:blue", label="Measured (calflops)"),
+        Patch(color="tab:orange", label="Estimated (2 x params)"),
+    ])
+    fig.text(
+        0.5, 0.01,
+        "Note: T5-based models (orange) use rough estimate — not directly comparable to measured values (blue)",
+        ha="center", fontsize=8, style="italic", color="gray",
+    )
+    plt.tight_layout(rect=[0, 0.03, 1, 1])
     fig.savefig(out_dir / "flops_comparison.png", dpi=150)
     plt.close(fig)
 
