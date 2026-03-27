@@ -277,25 +277,21 @@ def plot_quality_vs_latency(df: pd.DataFrame, out_dir: Path):
             zorder=5, label=m,
         )
 
-    # Labels with manual offsets for readability
-    label_offsets = {
-        "blip2-flan-t5-xl": (-5, -14),
-        "blip2-opt-2.7b": (8, 6),
-        "instructblip-flan-t5-xl": (8, -14),
-        "fuyu-8b": (-60, -14),
-        "llava-1.5-7b-hf": (8, -14),
-        "llava-1.5-13b-hf": (8, 8),
-        "instructblip-vicuna-7b": (8, -14),
-    }
+    # Auto-adjust labels to avoid overlap using adjustText
+    from adjustText import adjust_text
+    texts = []
     for _, row in avg.iterrows():
-        m = row["model_short"]
-        ox, oy = label_offsets.get(m, (8, 4))
-        ax.annotate(
-            m,
-            (row["latency"], row["wer"]),
+        texts.append(ax.text(
+            row["latency"], row["wer"], row["model_short"],
             fontsize=8, fontweight="bold",
-            xytext=(ox, oy), textcoords="offset points",
-        )
+        ))
+    adjust_text(
+        texts, ax=ax,
+        arrowprops=dict(arrowstyle="-", color="gray", lw=0.5),
+        expand=(2.0, 2.0),
+        force_text=(1.5, 1.5),
+        force_points=(1.0, 1.0),
+    )
 
     # Pareto frontier (lower-left is better for both axes)
     pareto = avg.sort_values("latency")
