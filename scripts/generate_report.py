@@ -237,64 +237,28 @@ def plot_energy_vs_resolution(df: pd.DataFrame, out_dir: Path):
     plt.close(fig)
 
 
-def plot_quality_vs_latency(df: pd.DataFrame, out_dir: Path):
-    subset = _baseline_filter(df).dropna(subset=["wer"])
-    if subset.empty:
-        return
+def _model_colors(models: list[str]) -> dict:
+    """Assign consistent colors to models sorted by latency."""
+    cmap = plt.cm.get_cmap("tab10", len(models))
+    return {m: cmap(i) for i, m in enumerate(models)}
 
-    # Average WER and latency across datasets per model
-    avg = (
-        subset.groupby("model_short")
-        .agg(latency=("latency_mean_ms", "mean"), wer=("wer", "mean"))
-        .reset_index()
-    )
 
-    # Assign consistent colors per model
-    models_sorted = avg.sort_values("latency")["model_short"].tolist()
-    cmap = plt.cm.get_cmap("tab10", len(models_sorted))
-    color_map = {m: cmap(i) for i, m in enumerate(models_sorted)}
+def _plot_wer_latency_single(
+    ax, data: pd.DataFrame, color_map: dict, title: str, show_legend: bool = False,
+):
+    """Plot WER vs latency on a single axes with Pareto frontier and labels."""
+    from adjustText import adjust_text
 
-    fig, ax = plt.subplots(figsize=(10, 7))
-
-    # Plot per-dataset points (small, transparent) and avg points (large)
-    dataset_markers = {"scienceqa": "^", "textvqa": "s", "coco_caption": "D"}
-    for _, row in subset.iterrows():
+    for _, row in data.iterrows():
         m = row["model_short"]
-        ds = row["dataset"]
-        marker = dataset_markers.get(ds, "o")
         ax.scatter(
             row["latency_mean_ms"], row["wer"],
-            s=40, alpha=0.35, color=color_map[m], marker=marker,
-            edgecolors="none",
+            s=140, color=color_map.get(m, "gray"), edgecolors="black",
+            linewidths=0.7, zorder=5, label=m if show_legend else None,
         )
 
-    # Plot averaged points (one per model) with labels
-    for _, row in avg.iterrows():
-        m = row["model_short"]
-        ax.scatter(
-            row["latency"], row["wer"],
-            s=180, color=color_map[m], edgecolors="black", linewidths=0.8,
-            zorder=5, label=m,
-        )
-
-    # Auto-adjust labels to avoid overlap using adjustText
-    from adjustText import adjust_text
-    texts = []
-    for _, row in avg.iterrows():
-        texts.append(ax.text(
-            row["latency"], row["wer"], row["model_short"],
-            fontsize=8, fontweight="bold",
-        ))
-    adjust_text(
-        texts, ax=ax,
-        arrowprops=dict(arrowstyle="-", color="gray", lw=0.5),
-        expand=(2.0, 2.0),
-        force_text=(1.5, 1.5),
-        force_points=(1.0, 1.0),
-    )
-
-    # Pareto frontier (lower-left is better for both axes)
-    pareto = avg.sort_values("latency")
+    # Pareto frontier
+    pareto = data.sort_values("latency_mean_ms")
     frontier = []
     best_wer = float("inf")
     for _, row in pareto.iterrows():
@@ -302,21 +266,64 @@ def plot_quality_vs_latency(df: pd.DataFrame, out_dir: Path):
             frontier.append(row)
             best_wer = row["wer"]
     if len(frontier) > 1:
-        fx = [r["latency"] for r in frontier]
-        fy = [r["wer"] for r in frontier]
-        ax.plot(fx, fy, "--", color="gray", alpha=0.5, linewidth=1.5, label="Pareto frontier")
+        ax.plot(
+            [r["latency_mean_ms"] for r in frontier],
+            [r["wer"] for r in frontier],
+            "--", color="gray", alpha=0.5, linewidth=1.5,
+        )
 
-    # Dataset marker legend
-    for ds, marker in dataset_markers.items():
-        ax.scatter([], [], marker=marker, s=40, color="gray", alpha=0.5, label=f"  {ds}")
+    # Labels
+    texts = []
+    for _, row in data.iterrows():
+        texts.append(ax.text(
+            row["latency_mean_ms"], row["wer"], row["model_short"],
+            fontsize=7.5, fontweight="bold",
+        ))
+    adjust_text(
+        texts, ax=ax,
+        arrowprops=dict(arrowstyle="-", color="gray", lw=0.5),
+        expand=(1.8, 1.8),
+        force_text=(1.2, 1.2),
+        force_points=(0.8, 0.8),
+    )
 
-    ax.set_xlabel("Latency (ms)", fontsize=11)
-    ax.set_ylabel("WER (lower is better)", fontsize=11)
-    ax.set_title("Quality (WER) vs Latency", fontsize=13)
-    ax.set_ylim(bottom=0)
-    ax.legend(fontsize=8, loc="upper left", framealpha=0.9)
+    ax.set_title(title, fontsize=11, fontweight="bold")
+    ax.set_xlabel("Latency (ms)", fontsize=9)
+    ax.set_ylabel("WER (lower is better)", fontsize=9)
+    wer_min, wer_max = data["wer"].min(), data["wer"].max()
+    wer_range = wer_max - wer_min if wer_max > wer_min else wer_max * 0.2
+    padding = max(wer_range * 0.3, 0.1)
+    ax.set_ylim(bottom=max(0, wer_min - padding), top=wer_max + padding)
+
+
+def plot_quality_vs_latency(df: pd.DataFrame, out_dir: Path):
+    subset = _baseline_filter(df).dropna(subset=["wer"])
+    if subset.empty:
+        return
+
+    # Average across datasets for summary
+    avg = (
+        subset.groupby("model_short")
+        .agg(latency_mean_ms=("latency_mean_ms", "mean"), wer=("wer", "mean"))
+        .reset_index()
+    )
+    models_sorted = avg.sort_values("latency_mean_ms")["model_short"].tolist()
+    color_map = _model_colors(models_sorted)
+
+    datasets = sorted(subset["dataset"].unique())
+
+    # --- Per-dataset charts (one subplot per dataset) ---
+    fig, axes = plt.subplots(1, len(datasets), figsize=(6 * len(datasets), 5.5))
+    if len(datasets) == 1:
+        axes = [axes]
+    dataset_titles = {"scienceqa": "ScienceQA", "textvqa": "TextVQA", "coco_caption": "COCO Caption"}
+    for ax_i, ds in zip(axes, datasets):
+        ds_data = subset[subset["dataset"] == ds].copy()
+        _plot_wer_latency_single(ax_i, ds_data, color_map, dataset_titles.get(ds, ds))
+
+    fig.suptitle("Quality (WER) vs Latency — by Dataset", fontsize=13, fontweight="bold", y=1.01)
     plt.tight_layout()
-    fig.savefig(out_dir / "quality_vs_latency.png", dpi=150)
+    fig.savefig(out_dir / "quality_vs_latency_by_dataset.png", dpi=150, bbox_inches="tight")
     plt.close(fig)
 
 
@@ -438,7 +445,7 @@ def generate_markdown_report(df: pd.DataFrame, out_dir: Path):
         ("optimization_speedup.png", "Optimization Speedup (FP16, torch.compile)"),
         ("energy_comparison.png", "Energy per Inference"),
         ("energy_vs_resolution.png", "Energy vs Resolution"),
-        ("quality_vs_latency.png", "Quality (WER) vs Latency"),
+        ("quality_vs_latency_by_dataset.png", "Quality (WER) vs Latency — by Dataset"),
         ("flops_comparison.png", "FLOPs Comparison"),
         ("param_breakdown.png", "Parameter Distribution by Component"),
         ("cpu_vs_gpu.png", "CPU vs GPU Latency"),
