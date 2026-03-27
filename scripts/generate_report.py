@@ -352,65 +352,23 @@ def generate_markdown_report(df: pd.DataFrame, out_dir: Path):
         report.append(pivot.to_markdown(floatfmt=".2f"))
         report.append("")
 
-    # Charts with descriptions
+    # Charts
     charts = [
-        ("latency_vs_resolution.png", "Latency vs Image Resolution",
-         "Most models show flat latency across resolutions — BLIP2 and InstructBLIP resize images internally to their fixed vision encoder size (224px). "
-         "Only Fuyu-8b (+62%) and Idefics2-8b (+28%) show meaningful latency increase at higher resolutions, as they process variable-size inputs natively."),
-
-        ("latency_vs_prompt_length.png", "Latency vs Prompt Length",
-         "Prompt length has a strong effect on smaller models: blip2-opt-2.7b goes from 57ms to 558ms (9.8x) at 200 tokens. "
-         "Larger autoregressive models (LLaVA, InstructBLIP-Vicuna) are already dominated by generation time, so input prompt length has minimal impact (~1.1x). "
-         "Fuyu-8b shows no sensitivity to prompt length (1.0x)."),
-
-        ("latency_vs_batch_size.png", "Latency vs Batch Size",
-         "Batching improves throughput for all models. The smaller models benefit most: blip2-flan-t5-xl throughput doubles from 7.5 to 16.8 samples/s at batch=8. "
-         "InstructBLIP-flan-t5-xl scales from 3.3 to 13.7 samples/s (4.2x). Larger 7-13B models see modest gains (2-4x throughput) due to memory bandwidth bottlenecks. "
-         "Fuyu-8b does not support batching (processor limitation)."),
-
-        ("optimization_speedup.png", "Optimization Speedup (FP16, torch.compile)",
-         "FP16 gives the largest speedup for blip2-opt-2.7b (2.75x), Idefics2 (3.09x), and LLaVA-7b (2.63x). "
-         "T5-based models (blip2-flan-t5-xl, instructblip-flan-t5-xl) show no benefit or slight regression from FP16 due to internal dtype casting overhead. "
-         "torch.compile provides negligible improvement (~1.0-1.1x) and is incompatible with T5-based architectures."),
-
-        ("energy_comparison.png", "Energy per Inference",
-         "Energy consumption correlates strongly with model size and latency. The most efficient model is blip2-opt-2.7b at ~29J per inference, "
-         "while the most expensive is instructblip-vicuna-7b at ~505J — a 17x difference. "
-         "The 3-4B parameter models (BLIP2, InstructBLIP-flan) consume 30-67J, while 7-13B models consume 237-505J."),
-
-        ("energy_vs_resolution.png", "Energy vs Resolution",
-         "Energy follows the same pattern as latency: flat for models with fixed internal resolution (BLIP2, InstructBLIP), "
-         "and increasing for Fuyu-8b and Idefics2 which process variable-size inputs. "
-         "This confirms that for most models, input resolution is not a lever for energy optimization."),
-
-        ("quality_vs_latency.png", "Quality (WER) vs Latency",
-         "The best quality-latency tradeoff is blip2-flan-t5-xl (WER 2.28, 133ms) — it achieves nearly the best quality at moderate latency. "
-         "InstructBLIP-flan-t5-xl offers similar quality (WER 2.36) but at 2.3x higher latency (301ms). "
-         "LLaVA models are the slowest (~1.6-1.9s) with the worst WER scores (19-20), suggesting their output format is less aligned with the evaluation metric. "
-         "Lower WER is better."),
-
-        ("flops_comparison.png", "FLOPs Comparison",
-         "LLaVA-13b has the highest measured FLOPs (~15.8 TFLOPs), followed by LLaVA-7b (~8.3 TFLOPs) and InstructBLIP-Vicuna-7b (~2.4 TFLOPs). "
-         "BLIP2-opt-2.7b requires ~0.75 TFLOPs per inference. "
-         "T5-based models (orange) show estimated values (2 x params) which are not directly comparable to measured FLOPs."),
-
-        ("param_breakdown.png", "Parameter Distribution by Component",
-         "Across all models, the language model (LLM backbone) dominates the parameter count at 70-73% of total parameters. "
-         "The vision encoder accounts for 10-26%, and the Q-Former bridge module is 2-5%. "
-         "This suggests that optimizing the LLM component (e.g., via quantization or distillation) would have the largest impact on model efficiency."),
-
-        ("cpu_vs_gpu.png", "CPU vs GPU Latency",
-         "GPU acceleration provides 16-32x speedup over CPU across all models (log scale). "
-         "The largest GPU advantage is for Fuyu-8b (32x), while the smallest is for Idefics2 (16x). "
-         "Larger models benefit more from GPU parallelism: 7-13B models see 23-27x speedup vs 19x for 3-4B models. "
-         "CPU inference is impractical for production use — even the fastest model (blip2-opt-2.7b) takes ~1.1s on CPU vs 57ms on GPU."),
+        ("latency_vs_resolution.png", "Latency vs Image Resolution"),
+        ("latency_vs_prompt_length.png", "Latency vs Prompt Length"),
+        ("latency_vs_batch_size.png", "Latency vs Batch Size"),
+        ("optimization_speedup.png", "Optimization Speedup (FP16, torch.compile)"),
+        ("energy_comparison.png", "Energy per Inference"),
+        ("energy_vs_resolution.png", "Energy vs Resolution"),
+        ("quality_vs_latency.png", "Quality (WER) vs Latency"),
+        ("flops_comparison.png", "FLOPs Comparison"),
+        ("param_breakdown.png", "Parameter Distribution by Component"),
+        ("cpu_vs_gpu.png", "CPU vs GPU Latency"),
     ]
-    for filename, title, description in charts:
+    for filename, title in charts:
         if (out_dir / filename).exists():
             report.append(f"## {title}\n")
             report.append(f"![{title}]({filename})\n")
-            report.append(description)
-            report.append("")
 
     # Limitations section
     report.append("## Known Limitations\n")
