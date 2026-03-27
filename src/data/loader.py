@@ -37,11 +37,18 @@ def load_scienceqa(num_samples: int = 300) -> list[VLMSample]:
         img = row["image"]
         if not isinstance(img, Image.Image):
             continue
+        # Resolve answer index to actual choice text
+        choices = row.get("choices", [])
+        answer_idx = row.get("answer", 0)
+        if isinstance(answer_idx, int) and 0 <= answer_idx < len(choices):
+            answer_text = choices[answer_idx]
+        else:
+            answer_text = str(answer_idx)
         samples.append(
             VLMSample(
                 image=img.convert("RGB"),
                 question=row["question"],
-                answer=str(row.get("answer", "")),
+                answer=answer_text,
                 dataset_name="scienceqa",
                 sample_id=idx,
             )

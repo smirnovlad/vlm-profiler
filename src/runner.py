@@ -195,12 +195,20 @@ def _run_generate_and_decode(
     image=None,
     prompt_text: str | None = None,
 ) -> list[str]:
-    """Run generate and decode the output."""
+    """Run generate and decode the output, stripping input prompt for decoder-only models."""
     output = _run_generate(loaded, inputs, max_new_tokens, image=image, prompt_text=prompt_text)
     if isinstance(output, str):
         return [output]
     if isinstance(output, list) and output and isinstance(output[0], str):
         return output
+    # For decoder-only models, generate() returns [input_ids + new_tokens].
+    # We must strip the input prefix to get only the generated answer.
+    # Encoder-decoder models (T5/FlanT5) return only new tokens, so input_ids
+    # length will be >= output length and slicing is a no-op.
+    if "input_ids" in inputs:
+        input_len = inputs["input_ids"].shape[1]
+        if output.shape[1] > input_len:
+            output = output[:, input_len:]
     return loaded.processor.batch_decode(output, skip_special_tokens=True)
 
 

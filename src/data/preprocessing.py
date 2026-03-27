@@ -3,10 +3,22 @@
 from PIL import Image
 
 # Model-specific prompt templates. {question} is replaced with the actual question.
+# OPT models need "Question: {} Answer:" format (BLIP-2 paper, Section 4.1)
+# Vicuna/LLaMA models need chat-style templates
+# FlanT5 models work with plain questions (encoder-decoder, no prompt echo)
 PROMPT_TEMPLATES: dict[str, str] = {
+    # BLIP-2 OPT (decoder-only, needs explicit QA format)
+    "Salesforce/blip2-opt-2.7b": "Question: {question} Answer:",
+    # InstructBLIP Vicuna (decoder-only)
+    "Salesforce/instructblip-vicuna-7b": "{question} Answer:",
+    # LLaVA (decoder-only, needs <image> token)
     "llava-hf/llava-1.5-7b-hf": "USER: <image>\n{question}\nASSISTANT:",
     "llava-hf/llava-1.5-13b-hf": "USER: <image>\n{question}\nASSISTANT:",
+    # Idefics2 (decoder-only, needs <image> token)
     "HuggingFaceM4/idefics2-8b": "User:<image>{question}<end_of_utterance>\nAssistant:",
+    # Fuyu (decoder-only, plain question works)
+    "adept/fuyu-8b": "{question}\n",
+    # FlanT5 models: no template needed (encoder-decoder)
 }
 
 
