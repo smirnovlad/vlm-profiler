@@ -180,7 +180,12 @@ def plot_optimization_speedup(df: pd.DataFrame, out_dir: Path):
     ax.set_xticks(x + width / 2)
     ax.set_xticklabels(models, rotation=45, ha="right")
     ax.legend()
-    plt.tight_layout()
+    fig.text(
+        0.5, 0.01,
+        "Note: bar = 0 means the optimization is not supported by the model (e.g. torch_compile fails on T5, FP16 on Fuyu)",
+        ha="center", fontsize=8, style="italic", color="gray",
+    )
+    plt.tight_layout(rect=[0, 0.03, 1, 1])
     fig.savefig(out_dir / "optimization_speedup.png", dpi=150)
     plt.close(fig)
 
