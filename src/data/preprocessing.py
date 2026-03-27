@@ -9,8 +9,9 @@ from PIL import Image
 PROMPT_TEMPLATES: dict[str, str] = {
     # BLIP-2 OPT (decoder-only, needs explicit QA format)
     "Salesforce/blip2-opt-2.7b": "Question: {question} Answer:",
-    # InstructBLIP Vicuna (decoder-only)
-    "Salesforce/instructblip-vicuna-7b": "{question} Answer:",
+    # InstructBLIP Vicuna (decoder-only, plain question — processor handles formatting)
+    # Note: adding "Answer:" suffix causes garbage generation with this model
+    "Salesforce/instructblip-vicuna-7b": "{question}",
     # LLaVA (decoder-only, needs <image> token)
     "llava-hf/llava-1.5-7b-hf": "USER: <image>\n{question}\nASSISTANT:",
     "llava-hf/llava-1.5-13b-hf": "USER: <image>\n{question}\nASSISTANT:",

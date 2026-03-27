@@ -24,9 +24,14 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 
 def load_all_results(outputs_root: Path) -> pd.DataFrame:
-    """Scan outputs_root/{model_name}/{timestamp}/results/*.json and merge."""
-    records = []
-    for json_file in outputs_root.rglob("results/*.json"):
+    """Scan outputs_root/{model_name}/{timestamp}/results/*.json and merge.
+
+    When duplicate experiment configs exist (e.g. from reruns), keeps only
+    the latest result based on file path (which encodes date/timestamp).
+    """
+    # Collect all results keyed by experiment config, later file wins
+    by_config: dict[tuple, dict] = {}
+    for json_file in sorted(outputs_root.rglob("results/*.json")):
         try:
             data = json.loads(json_file.read_text())
             if data.get("status") != "success":
@@ -76,9 +81,16 @@ def load_all_results(outputs_root: Path) -> pd.DataFrame:
                 flat["total_params"] = sum(data["param_counts"].values())
                 for comp, count in data["param_counts"].items():
                     flat[f"params_{comp}"] = count
-            records.append(flat)
+            # Dedup key: keep latest result per experiment config
+            config_key = (
+                flat["model"], flat["dataset"], flat["resolution"],
+                flat["prompt_length"], flat["device"],
+                flat["optimization"], flat["batch_size"],
+            )
+            by_config[config_key] = flat
         except (json.JSONDecodeError, KeyError, TypeError):
             continue
+    records = list(by_config.values())
     return pd.DataFrame(records)
 
 
