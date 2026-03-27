@@ -350,6 +350,22 @@ def generate_markdown_report(df: pd.DataFrame, out_dir: Path):
             report.append(f"## {title}\n")
             report.append(f"![{title}]({filename})\n")
 
+    # Limitations section
+    report.append("## Known Limitations\n")
+    report.append("### Model-specific incompatibilities\n")
+    report.append("| Model | Issue | Affected experiments |")
+    report.append("|-------|-------|---------------------|")
+    report.append("| adept/fuyu-8b | FP16 causes dtype mismatch (Float vs Half) | 3 (fp16 x 3 datasets) |")
+    report.append("| adept/fuyu-8b | Processor returns lists for batched inputs | 9 (batch>1 x 3 datasets) |")
+    report.append("| blip2-flan-t5-xl | torch.compile fails (T5 architecture) | 3 (torch_compile x 3 datasets) |")
+    report.append("| instructblip-flan-t5-xl | torch.compile fails (T5 architecture) | 3 (torch_compile x 3 datasets) |")
+    report.append("")
+    report.append("### Other notes\n")
+    report.append("- **Resolution scaling is flat** for BLIP2/InstructBLIP — they resize internally to fixed vision encoder resolution")
+    report.append("- **FLOPs**: exact measurement (calflops) only for some models; T5-based use rough estimate (2 x params)")
+    report.append("- **FP16 can be slower** on T5-based models due to internal dtype casting overhead")
+    report.append("")
+
     (out_dir / "REPORT.md").write_text("\n".join(report))
 
 
