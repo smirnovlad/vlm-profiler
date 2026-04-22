@@ -66,10 +66,20 @@ def _make_generate_fn(loaded):
     return gen
 
 
-def measure_one_model(model_name: str, sample, gpu_index: int) -> dict:
-    logger.info("=== %s ===", model_name)
+def measure_one_model(
+    model_name: str,
+    sample,
+    gpu_index: int,
+    warmup_runs: int = 2,
+    timed_runs: int = 3,
+    optimization: str = "none",
+) -> dict:
+    logger.info(
+        "=== %s (opt=%s, warmup=%d, timed=%d) ===",
+        model_name, optimization, warmup_runs, timed_runs,
+    )
     loaded = load_model(
-        model_name, device="cuda", optimization="none", gpu_index=gpu_index
+        model_name, device="cuda", optimization=optimization, gpu_index=gpu_index
     )
     try:
         inputs = _build_inputs(loaded, sample, BASELINE["resolution"])
@@ -79,11 +89,16 @@ def measure_one_model(model_name: str, sample, gpu_index: int) -> dict:
             loaded.model,
             inputs,
             generate_fn=lambda inp: gen_fn(inp, max_new_tokens=50),
-            warmup_runs=2,
-            timed_runs=3,
+            warmup_runs=warmup_runs,
+            timed_runs=timed_runs,
         )
         pd = measure_prefill_decode(
-            gen_fn, inputs, short_n=1, long_n=50, warmup_runs=1, timed_runs=3
+            gen_fn,
+            inputs,
+            short_n=1,
+            long_n=50,
+            warmup_runs=max(warmup_runs - 1, 1),
+            timed_runs=timed_runs,
         )
 
         record = {
@@ -117,6 +132,13 @@ def main():
         help="Override model list (default: all from config)",
     )
     parser.add_argument("--gpu-index", type=int, default=0)
+    parser.add_argument("--warmup-runs", type=int, default=2)
+    parser.add_argument("--timed-runs", type=int, default=3)
+    parser.add_argument(
+        "--optimization", default="none",
+        choices=["none", "fp16", "flash_attn2"],
+        help="Load dtype/attention mode (default: none = fp32 baseline)",
+    )
     parser.add_argument(
         "--output", default=str(OUTPUT_PATH),
         help="Where to write the JSON result",
@@ -148,15 +170,29 @@ def main():
         except (json.JSONDecodeError, KeyError):
             logger.warning("Existing breakdown file unreadable, starting fresh")
 
+    # When running with a non-baseline optimization, we key records by
+    # "{model}@{opt}" so they don't overwrite the fp32 baseline entries.
+    key_suffix = "" if args.optimization == "none" else f"@{args.optimization}"
+
     for model_name in models:
         try:
-            rec = measure_one_model(model_name, sample, args.gpu_index)
-            existing[model_name] = rec
+            rec = measure_one_model(
+                model_name,
+                sample,
+                args.gpu_index,
+                warmup_runs=args.warmup_runs,
+                timed_runs=args.timed_runs,
+                optimization=args.optimization,
+            )
+            if key_suffix:
+                rec["optimization"] = args.optimization
+            existing[model_name + key_suffix] = rec
         except Exception as e:  # pragma: no cover — surfaced via log
             logger.error("Failed on %s: %s", model_name, e)
-            existing[model_name] = {
+            existing[model_name + key_suffix] = {
                 "model": model_name,
                 "baseline": BASELINE,
+                "optimization": args.optimization,
                 "error": str(e),
             }
         # Persist after every model so an OOM late in the run doesn't lose data

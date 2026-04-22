@@ -344,15 +344,17 @@ Top-level submodules (\texttt{vision\_model} / \texttt{vision\_tower} / \texttt{
 \caption{Same data as Figure~\ref{fig:component_share} but in absolute milliseconds.}
 \end{figure}
 
-The language decoder dominates for every model: typically 70--90\,\% of measured forward-pass time, the rest split between the vision encoder and the projector/Q-former.  This matches the resolution sweep from the baseline experiment: changing image resolution barely moves latency because the vision encoder is a small fraction of the total.  Concretely, if you want a single optimization target, it is the LLM decoder.
+The language decoder dominates inference time, but the share depends sharply on model size.  Measured decoder share: \texttt{blip2-opt-2.7b} 74\,\%, \texttt{blip2-flan-t5-xl} 87\,\%, \texttt{instructblip-flan-t5-xl} 84\,\%, and the 7B+ models (\texttt{instructblip-vicuna-7b}, \texttt{llava-1.5-7b}, \texttt{llava-1.5-13b}, \texttt{fuyu-8b}) all sit at 98--99.99\,\%.  For the small BLIP-family the vision encoder + Q-former still accounts for roughly 15--25\,\% of forward time, so ViT-level optimizations are not pointless there.  For everything $\geq$7B, the decoder is essentially the only thing that matters.  This also matches the resolution sweep from Experiment~1: latency is flat in resolution because the vision encoder is a small fraction of the total, and the fraction only shrinks as models get larger.
 
 \subsection{Prefill vs.\ per-token decode}
 
 \begin{figure}[H]
 \centering
 \includegraphics[width=\textwidth]{prefill_vs_decode.png}
-\caption{Prefill cost vs.\ per-token decode cost for each model.}
+\caption{Prefill cost vs.\ per-token decode cost for each model. Baseline (FP32) except \texttt{llava-1.5-13b} which is loaded in FP16 because 48\,GiB is insufficient for FP32 weights.}
 \end{figure}
+
+\paragraph{Dtype asymmetry and FP16 sanity check.} In the chart above, \texttt{llava-1.5-13b} appears faster than \texttt{llava-1.5-7b}, which is suspicious. The reason is that 13B is loaded in FP16 (it does not fit in FP32 on a 48\,GiB card) while 7B runs at baseline FP32. Running 7B in FP16 for a direct comparison confirms the dtype is what explains the gap: prefill drops from 432 to 94.5\,ms (4.6$\times$) and per-token decode from 29.5 to 15.3\,ms (1.9$\times$). Prefill wins more than decode because prefill attention is memory-bandwidth bound on Ada, and FP16 halves weight/activation traffic; decode is mostly matmul against a KV cache, closer to the theoretical 2$\times$ ceiling.  In FP16 the expected size ordering is restored: 7B (94.5\,ms prefill, 15.3\,ms/token) is cleanly faster than 13B (169\,ms prefill, 33\,ms/token).
 
 This split tells us \emph{where inside the decoder} to focus:
 
@@ -366,10 +368,11 @@ For the models measured here, prefill ranges in the tens to low hundreds of ms a
 \subsection{Takeaways}
 
 \begin{enumerate}[nosep]
-  \item The LLM decoder is the optimization target for every model — the vision encoder and projector are under 30\,\% of inference time even at $512 \times 512$ input.
+  \item The LLM decoder is the optimization target for every 7B+ model (98--99.99\,\% of forward time). For models under 4B, vision + Q-former is still 15--25\,\% and is worth optimizing, but even there decoder is the majority.
   \item For short answers (VQA-style, 5--10 tokens) optimize prefill: FlashAttention-2, chunked prefill.
   \item For long answers (captions, explanations, $\geq 50$ tokens) optimize decode: speculative decoding, INT8/INT4 weight quantization, KV-cache quantization.
-  \item FP16 alone already gives $\sim\!2\times$ on decoder-only models (see Experiment~1).  The next layer of wins is architectural, not a dtype flip.
+  \item FP16 alone gives 4.6$\times$ on prefill and 1.9$\times$ on decode for \texttt{llava-1.5-7b}.  The next layer of wins is architectural (FlashAttention-2, speculative decoding), not another dtype flip.
+  \item \texttt{fuyu-8b} has the highest per-token decode cost (41\,ms) despite being 8B, because it has no separate vision tower: image patches are injected as input tokens, which inflates the context length and therefore the KV cache at every decode step.
 \end{enumerate}
 
 % ============================================================
