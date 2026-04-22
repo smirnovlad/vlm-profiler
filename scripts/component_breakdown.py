@@ -176,7 +176,17 @@ def main():
         try:
             prev = json.loads(output_path.read_text())
             for r in prev.get("results", []):
-                existing[r["model"]] = r
+                # Reconstruct the suffix from stored metadata so that
+                # non-baseline records aren't collapsed onto the baseline key.
+                parts = []
+                opt = r.get("optimization")
+                if opt and opt != "none":
+                    parts.append(opt)
+                attn = r.get("attn_impl")
+                if attn:
+                    parts.append(attn)
+                suffix = "@" + "+".join(parts) if parts else ""
+                existing[r["model"] + suffix] = r
         except (json.JSONDecodeError, KeyError):
             logger.warning("Existing breakdown file unreadable, starting fresh")
 

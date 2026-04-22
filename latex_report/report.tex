@@ -363,7 +363,16 @@ This split tells us \emph{where inside the decoder} to focus:
   \item If per-token decode dominates at \texttt{max\_new\_tokens=50}, the autoregressive loop is the bottleneck. Speculative decoding, smaller draft models, or quantized KV cache are the right tools.
 \end{itemize}
 
-For the models measured here, prefill ranges in the tens to low hundreds of ms and decode in the 1--20\,ms/token range.  At \texttt{max\_new\_tokens=50} the decode portion equals roughly 50$\times$ the per-token cost, so whichever term is larger at that point in the chart is the dominant cost for this workload.  For workloads that generate shorter answers (e.g.\ 5--10 tokens) prefill is more important; for longer generations (captioning, explanations), decode dominates quickly.
+For the models measured here, prefill ranges in the tens to low hundreds of ms and decode in the 1--40\,ms/token range.  At \texttt{max\_new\_tokens=50} the decode portion equals roughly 50$\times$ the per-token cost, so whichever term is larger at that point in the chart is the dominant cost for this workload.  For workloads that generate shorter answers (e.g.\ 5--10 tokens) prefill is more important; for longer generations (captioning, explanations), decode dominates quickly.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{prefill_decode_crossover.png}
+\caption{Total latency $t(N) = t_{\text{prefill}} + N \cdot t_{\text{decode}}$ as a function of generation length $N$.  Each model has a crossover point $N^* = t_{\text{prefill}}/t_{\text{decode}}$ where per-token decode cost equals the one-off prefill cost. Below $N^*$ prefill dominates total latency; above $N^*$, decode does.}
+\label{fig:crossover}
+\end{figure}
+
+The crossover points $N^*$ tell us at what generation length each workload shifts from prefill-bound to decode-bound. For the small BLIP-family models $N^* \approx 44-54$ tokens — prefill is still the larger cost for short VQA answers (5--10 tokens) and is only slightly sub-dominant at caption length. For the 7B+ models $N^* \leq 15$ tokens (Fuyu $\approx 1.6$, InstructBLIP-Vicuna $\approx 4.1$, LLaVA-13b $\approx 5.1$, LLaVA-7b $\approx 15.0$) — they cross into decode-bound territory almost immediately. \texttt{llava-1.5-7b} appears with a high $N^*$ only because it is the one 7B+ model still measured in FP32 here (13b had to load in FP16 to fit in 48\,GiB); the dtype asymmetry discussed below inflates its prefill four-fold and therefore its crossover point.
 
 \subsection{FlashAttention-2 contribution}
 

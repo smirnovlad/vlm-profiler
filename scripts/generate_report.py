@@ -386,6 +386,8 @@ def plot_component_latency_breakdown(breakdown_path: Path, out_dir: Path):
 
     records = []
     for rec in data.get("results", []):
+        if rec.get("optimization") not in (None, "none"):
+            continue
         if "component_times" not in rec:
             continue
         per_call = rec["component_times"].get("per_call_ms", {})
@@ -433,6 +435,67 @@ def plot_component_latency_breakdown(breakdown_path: Path, out_dir: Path):
     plt.close(fig)
 
 
+def plot_prefill_decode_crossover(breakdown_path: Path, out_dir: Path):
+    """Total latency t(N) = prefill + N * decode, as a function of N.
+
+    Annotates N* = prefill / decode_per_token per model — the generation
+    length at which per-token decode cost equals the one-off prefill cost.
+    Below N*, prefill dominates; above, decode does.
+    """
+    if not breakdown_path.exists():
+        return
+    try:
+        data = json.loads(breakdown_path.read_text())
+    except json.JSONDecodeError:
+        return
+
+    rows = []
+    for rec in data.get("results", []):
+        if rec.get("optimization") not in (None, "none"):
+            continue
+        pd_times = rec.get("prefill_decode")
+        if not pd_times or pd_times["decode_per_token_ms"] <= 0:
+            continue
+        rows.append({
+            "model_short": rec["model"].split("/")[-1],
+            "prefill_ms": pd_times["prefill_ms"],
+            "decode_ms_per_token": pd_times["decode_per_token_ms"],
+        })
+    if not rows:
+        return
+    rows.sort(key=lambda r: r["prefill_ms"] / r["decode_ms_per_token"])
+
+    fig, ax = plt.subplots(figsize=(12, 6))
+    n_range = np.arange(1, 201)
+    cmap = plt.cm.get_cmap("tab10", len(rows))
+    for i, r in enumerate(rows):
+        prefill = r["prefill_ms"]
+        decode = r["decode_ms_per_token"]
+        total = prefill + n_range * decode
+        n_star = prefill / decode
+        color = cmap(i)
+        ax.plot(
+            n_range, total, color=color,
+            label=f"{r['model_short']} (N*={n_star:.1f})",
+        )
+        if 1 <= n_star <= 200:
+            ax.axvline(n_star, color=color, linestyle=":", alpha=0.4, linewidth=1)
+
+    ax.set_xlabel("Generation length N (tokens)")
+    ax.set_ylabel("Total latency (ms)")
+    ax.set_title(
+        "Prefill vs per-token decode: total latency as a function of "
+        "generation length\n"
+        "Vertical lines mark N* where per-token decode cost equals prefill"
+    )
+    ax.set_yscale("log")
+    ax.grid(alpha=0.3)
+    ax.legend(fontsize=8, loc="upper left")
+    plt.tight_layout()
+    fig.savefig(out_dir / "prefill_decode_crossover.png", dpi=150)
+    plt.close(fig)
+
+
 def plot_prefill_vs_decode(breakdown_path: Path, out_dir: Path):
     """Grouped bar chart: prefill cost vs decode cost per token."""
     if not breakdown_path.exists():
@@ -444,6 +507,8 @@ def plot_prefill_vs_decode(breakdown_path: Path, out_dir: Path):
 
     rows = []
     for rec in data.get("results", []):
+        if rec.get("optimization") not in (None, "none"):
+            continue
         pd_times = rec.get("prefill_decode")
         if not pd_times:
             continue
@@ -548,6 +613,7 @@ def generate_markdown_report(df: pd.DataFrame, out_dir: Path):
         ("component_latency_share.png", "Per-Component Share of Inference Time"),
         ("component_latency_breakdown.png", "Per-Component Latency Breakdown (ms)"),
         ("prefill_vs_decode.png", "Prefill vs Per-Token Decode Cost"),
+        ("prefill_decode_crossover.png", "Prefill vs Decode Crossover by Generation Length"),
     ]
     for filename, title in charts:
         if (out_dir / filename).exists():
@@ -615,6 +681,7 @@ def main():
     breakdown_path = Path("results/component_breakdown.json")
     plot_component_latency_breakdown(breakdown_path, report_dir)
     plot_prefill_vs_decode(breakdown_path, report_dir)
+    plot_prefill_decode_crossover(breakdown_path, report_dir)
 
     generate_markdown_report(df, report_dir)
 
