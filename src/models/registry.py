@@ -109,6 +109,7 @@ def load_model(
     device: str = "cuda",
     optimization: str = "none",
     gpu_index: int = 0,
+    attn_impl: str | None = None,
 ) -> LoadedModel:
     """Load a VLM with the specified optimization.
 
@@ -117,6 +118,8 @@ def load_model(
         device: 'cuda' or 'cpu'
         optimization: 'none', 'fp16', 'torch_compile', 'flash_attn2'
         gpu_index: GPU device index (0 or 1) for multi-GPU setups
+        attn_impl: Explicit attention implementation override
+                   ('sdpa', 'eager', 'flash_attention_2'). If None, model default.
 
     Returns:
         LoadedModel with model, processor, and metadata
@@ -147,6 +150,10 @@ def load_model(
         model_kwargs["attn_implementation"] = "flash_attention_2"
     else:
         model_kwargs[dtype_key] = torch.float32
+
+    if attn_impl is not None:
+        # Explicit override beats the optimization-implied default
+        model_kwargs["attn_implementation"] = attn_impl
 
     logger.info(
         "Loading model=%s, device=%s, opt=%s", model_name, device, optimization

@@ -73,13 +73,18 @@ def measure_one_model(
     warmup_runs: int = 2,
     timed_runs: int = 3,
     optimization: str = "none",
+    attn_impl: str | None = None,
 ) -> dict:
     logger.info(
-        "=== %s (opt=%s, warmup=%d, timed=%d) ===",
-        model_name, optimization, warmup_runs, timed_runs,
+        "=== %s (opt=%s, attn=%s, warmup=%d, timed=%d) ===",
+        model_name, optimization, attn_impl or "default", warmup_runs, timed_runs,
     )
     loaded = load_model(
-        model_name, device="cuda", optimization=optimization, gpu_index=gpu_index
+        model_name,
+        device="cuda",
+        optimization=optimization,
+        gpu_index=gpu_index,
+        attn_impl=attn_impl,
     )
     try:
         inputs = _build_inputs(loaded, sample, BASELINE["resolution"])
@@ -140,6 +145,11 @@ def main():
         help="Load dtype/attention mode (default: none = fp32 baseline)",
     )
     parser.add_argument(
+        "--attn-impl", default=None,
+        choices=["sdpa", "eager", "flash_attention_2"],
+        help="Explicit attention implementation override (for FA2 vs eager A/B)",
+    )
+    parser.add_argument(
         "--output", default=str(OUTPUT_PATH),
         help="Where to write the JSON result",
     )
@@ -170,9 +180,14 @@ def main():
         except (json.JSONDecodeError, KeyError):
             logger.warning("Existing breakdown file unreadable, starting fresh")
 
-    # When running with a non-baseline optimization, we key records by
-    # "{model}@{opt}" so they don't overwrite the fp32 baseline entries.
-    key_suffix = "" if args.optimization == "none" else f"@{args.optimization}"
+    # When running with a non-baseline optimization (or explicit attn override),
+    # we key records by "{model}@{opt}[:attn]" so they don't overwrite baseline.
+    key_parts = []
+    if args.optimization != "none":
+        key_parts.append(args.optimization)
+    if args.attn_impl is not None:
+        key_parts.append(args.attn_impl)
+    key_suffix = "" if not key_parts else "@" + "+".join(key_parts)
 
     for model_name in models:
         try:
@@ -183,9 +198,12 @@ def main():
                 warmup_runs=args.warmup_runs,
                 timed_runs=args.timed_runs,
                 optimization=args.optimization,
+                attn_impl=args.attn_impl,
             )
             if key_suffix:
                 rec["optimization"] = args.optimization
+                if args.attn_impl is not None:
+                    rec["attn_impl"] = args.attn_impl
             existing[model_name + key_suffix] = rec
         except Exception as e:  # pragma: no cover — surfaced via log
             logger.error("Failed on %s: %s", model_name, e)

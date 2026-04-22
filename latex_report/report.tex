@@ -365,13 +365,36 @@ This split tells us \emph{where inside the decoder} to focus:
 
 For the models measured here, prefill ranges in the tens to low hundreds of ms and decode in the 1--20\,ms/token range.  At \texttt{max\_new\_tokens=50} the decode portion equals roughly 50$\times$ the per-token cost, so whichever term is larger at that point in the chart is the dominant cost for this workload.  For workloads that generate shorter answers (e.g.\ 5--10 tokens) prefill is more important; for longer generations (captioning, explanations), decode dominates quickly.
 
+\subsection{FlashAttention-2 contribution}
+
+The task description lists FlashAttention-2 as an optimization axis to evaluate. In this project FA2 is delivered via PyTorch's \texttt{scaled\_dot\_product\_attention}: on Ada in FP16 the SDPA dispatch selects a Flash-Attention-2 kernel under the hood. The standalone \texttt{flash-attn} pip package could not be built in this environment — it requires \texttt{nvcc} $\geq$ 11.7 and the system only has 11.5 — so we use the torch-native path, which Transformers 5.x already enables by default (\texttt{attn\_implementation="sdpa"}).
+
+To isolate FA2's contribution we re-ran two models in FP16 with \texttt{attn\_implementation="eager"} (the reference quadratic-memory attention) and compared against the SDPA default.
+
+\begin{table}[H]
+\centering
+\caption{Prefill and per-token decode with FA2-enabled SDPA vs.\ eager attention. Baseline config (res=224, plen=10, bs=1, FP16). Values are averaged over 7 timed runs after 3 warmup runs.}
+\begin{tabular}{@{}lccccc@{}}
+\toprule
+Model & SDPA prefill (ms) & eager prefill (ms) & \textbf{FA2 speedup} & SDPA decode/tok (ms) & eager decode/tok (ms) \\
+\midrule
+\texttt{llava-1.5-7b} & 94.5 & 105.4 & 1.11$\times$ & 15.30 & 15.56 \\
+\texttt{llava-1.5-13b} & 169.0 & 181.3 & 1.07$\times$ & 33.00 & 34.20 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+FA2 gives a 7--11\,\% prefill speedup at baseline and essentially no decode speedup (within measurement noise). The reason is sequence length: at plen=10 the LLaVA input is $\approx\!586$ tokens (10 text + 576 image patch tokens). FA2's benefit over eager attention comes from avoiding the $O(N^2)$ intermediate attention matrix materialization; at $N \approx 600$ that matrix still fits comfortably in cache, so the memory-access win is modest. The gain should scale with longer prompts, higher resolutions, or larger batch sizes — for workloads with $N$ in the few-thousand-token range (long conversations, multi-image prompts, high-res captioning) the FA2 speedup on prefill would be substantially larger. Decode speed is unaffected because during single-token autoregressive steps the attention is over the KV-cache only, one query vector at a time, and the quadratic-memory concern does not apply.
+
+Practical implication: for the short-answer VQA workloads profiled here, FA2 alone is not a meaningful lever. For long-context workloads it would be. The bigger win across the board remains the FP16 dtype flip itself (4.6$\times$ prefill for llava-7b) rather than the attention-kernel choice within FP16.
+
 \subsection{Takeaways}
 
 \begin{enumerate}[nosep]
   \item The LLM decoder is the optimization target for every 7B+ model (98--99.99\,\% of forward time). For models under 4B, vision + Q-former is still 15--25\,\% and is worth optimizing, but even there decoder is the majority.
   \item For short answers (VQA-style, 5--10 tokens) optimize prefill: FlashAttention-2, chunked prefill.
   \item For long answers (captions, explanations, $\geq 50$ tokens) optimize decode: speculative decoding, INT8/INT4 weight quantization, KV-cache quantization.
-  \item FP16 alone gives 4.6$\times$ on prefill and 1.9$\times$ on decode for \texttt{llava-1.5-7b}.  The next layer of wins is architectural (FlashAttention-2, speculative decoding), not another dtype flip.
+  \item FP16 alone gives 4.6$\times$ on prefill and 1.9$\times$ on decode for \texttt{llava-1.5-7b}.  FlashAttention-2 on top of FP16 is only a 1.07--1.11$\times$ prefill speedup at baseline short prompts, because the sequence length is not large enough to stress eager attention; the gain would scale with longer contexts.
   \item \texttt{fuyu-8b} has the highest per-token decode cost (41\,ms) despite being 8B, because it has no separate vision tower: image patches are injected as input tokens, which inflates the context length and therefore the KV cache at every decode step.
 \end{enumerate}
 
