@@ -25,7 +25,8 @@ Each experiment records latency (mean/std/percentiles), energy draw via `nvidia-
 | llava-1.5-7b-hf | 7,063M | LLaVA 1.5 |
 | llava-1.5-13b-hf | 13,351M | LLaVA 1.5 |
 | fuyu-8b | 9,408M | Fuyu |
-| idefics2-8b | 8,403M | IDEFICS2 |
+
+`idefics2-8b` was in the original plan but dropped: every generation call crashes with a pixel-values shape mismatch against transformers 5.x. Tracked as a known compatibility issue, not included in results.
 
 ## Datasets
 
@@ -87,7 +88,7 @@ cd latex_report && tectonic report.tex
 
 **Done:**
 - Full profiling pipeline (latency, FLOPs, energy, quality)
-- 8 models tested across 3 datasets, ~360 experiments
+- 7 models tested across 3 datasets, ~330 successful experiments
 - Report with 10 charts and per-chart analysis
 - PDF report ready for submission
 

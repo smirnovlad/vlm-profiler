@@ -372,6 +372,102 @@ def plot_param_breakdown(df: pd.DataFrame, out_dir: Path):
     plt.close(fig)
 
 
+def plot_component_latency_breakdown(breakdown_path: Path, out_dir: Path):
+    """Stacked horizontal bar chart of per-component latency share per model.
+
+    Reads results/component_breakdown.json produced by scripts/component_breakdown.py.
+    """
+    if not breakdown_path.exists():
+        return
+    try:
+        data = json.loads(breakdown_path.read_text())
+    except json.JSONDecodeError:
+        return
+
+    records = []
+    for rec in data.get("results", []):
+        if "component_times" not in rec:
+            continue
+        per_call = rec["component_times"].get("per_call_ms", {})
+        if not per_call:
+            continue
+        model_short = rec["model"].split("/")[-1]
+        row = {"model_short": model_short, **per_call}
+        row["_total"] = sum(per_call.values())
+        records.append(row)
+    if not records:
+        return
+    df_comp = pd.DataFrame(records).fillna(0.0)
+    df_comp = df_comp.sort_values("_total")
+    component_cols = [c for c in df_comp.columns if c not in ("model_short", "_total")]
+
+    # Absolute ms chart
+    fig, ax = plt.subplots(figsize=(12, 5.5))
+    left = np.zeros(len(df_comp))
+    color_palette = plt.cm.get_cmap("tab10", len(component_cols))
+    for i, comp in enumerate(component_cols):
+        vals = df_comp[comp].values
+        ax.barh(df_comp["model_short"], vals, left=left, label=comp, color=color_palette(i))
+        left = left + vals
+    ax.set_xlabel("Latency per inference (ms, sum of forward-pass time per submodule)")
+    ax.set_title("Per-component latency breakdown (baseline: res=224, plen=10, bs=1, FP32)")
+    ax.legend(title="Component", bbox_to_anchor=(1.02, 1), loc="upper left", fontsize=8)
+    plt.tight_layout()
+    fig.savefig(out_dir / "component_latency_breakdown.png", dpi=150)
+    plt.close(fig)
+
+    # Share chart
+    fig, ax = plt.subplots(figsize=(12, 5.5))
+    shares = df_comp[component_cols].div(df_comp[component_cols].sum(axis=1), axis=0) * 100.0
+    left = np.zeros(len(df_comp))
+    for i, comp in enumerate(component_cols):
+        vals = shares[comp].values
+        ax.barh(df_comp["model_short"], vals, left=left, label=comp, color=color_palette(i))
+        left = left + vals
+    ax.set_xlim(0, 100)
+    ax.set_xlabel("Share of measured component time (%)")
+    ax.set_title("Component share of inference time (baseline: res=224, plen=10, bs=1, FP32)")
+    ax.legend(title="Component", bbox_to_anchor=(1.02, 1), loc="upper left", fontsize=8)
+    plt.tight_layout()
+    fig.savefig(out_dir / "component_latency_share.png", dpi=150)
+    plt.close(fig)
+
+
+def plot_prefill_vs_decode(breakdown_path: Path, out_dir: Path):
+    """Grouped bar chart: prefill cost vs decode cost per token."""
+    if not breakdown_path.exists():
+        return
+    try:
+        data = json.loads(breakdown_path.read_text())
+    except json.JSONDecodeError:
+        return
+
+    rows = []
+    for rec in data.get("results", []):
+        pd_times = rec.get("prefill_decode")
+        if not pd_times:
+            continue
+        rows.append({
+            "model_short": rec["model"].split("/")[-1],
+            "prefill_ms": pd_times["prefill_ms"],
+            "decode_ms_per_token": pd_times["decode_per_token_ms"],
+        })
+    if not rows:
+        return
+    df_pd = pd.DataFrame(rows).sort_values("prefill_ms")
+
+    fig, axes = plt.subplots(1, 2, figsize=(14, 5.5))
+    axes[0].barh(df_pd["model_short"], df_pd["prefill_ms"], color="tab:blue")
+    axes[0].set_xlabel("Prefill latency (ms)")
+    axes[0].set_title("Prefill cost per inference")
+    axes[1].barh(df_pd["model_short"], df_pd["decode_ms_per_token"], color="tab:green")
+    axes[1].set_xlabel("Decode latency per token (ms)")
+    axes[1].set_title("Per-token decode cost")
+    plt.tight_layout()
+    fig.savefig(out_dir / "prefill_vs_decode.png", dpi=150)
+    plt.close(fig)
+
+
 def plot_cpu_vs_gpu(df: pd.DataFrame, out_dir: Path):
     gpu = df[
         (df["device"] == "cuda") & (df["optimization"] == "none")
@@ -449,6 +545,9 @@ def generate_markdown_report(df: pd.DataFrame, out_dir: Path):
         ("flops_comparison.png", "FLOPs Comparison"),
         ("param_breakdown.png", "Parameter Distribution by Component"),
         ("cpu_vs_gpu.png", "CPU vs GPU Latency"),
+        ("component_latency_share.png", "Per-Component Share of Inference Time"),
+        ("component_latency_breakdown.png", "Per-Component Latency Breakdown (ms)"),
+        ("prefill_vs_decode.png", "Prefill vs Per-Token Decode Cost"),
     ]
     for filename, title in charts:
         if (out_dir / filename).exists():
@@ -511,6 +610,12 @@ def main():
     plot_flops_comparison(df, report_dir)
     plot_param_breakdown(df, report_dir)
     plot_cpu_vs_gpu(df, report_dir)
+
+    # Component breakdown charts (read from a separate JSON)
+    breakdown_path = Path("results/component_breakdown.json")
+    plot_component_latency_breakdown(breakdown_path, report_dir)
+    plot_prefill_vs_decode(breakdown_path, report_dir)
+
     generate_markdown_report(df, report_dir)
 
     print(f"Report generated at {report_dir / 'REPORT.md'}")

@@ -6,7 +6,7 @@ models:
   - Salesforce/instructblip-flan-t5-xl
   - Salesforce/blip2-flan-t5-xl
   - adept/fuyu-8b
-  - HuggingFaceM4/idefics2-8b
+  # - HuggingFaceM4/idefics2-8b  # disabled: pixel_values shape mismatch on transformers 5.x
 
 datasets:
   - name: scienceqa

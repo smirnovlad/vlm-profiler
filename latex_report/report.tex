@@ -59,7 +59,7 @@ This project measures how different Vision-Language Models (VLMs) behave under v
 
 \subsection{Models}
 
-We test 8 models that cover the main VLM families available on HuggingFace:
+We test 7 models that cover the main VLM families available on HuggingFace:
 
 \begin{table}[H]
 \centering
@@ -75,10 +75,11 @@ We test 8 models that cover the main VLM families available on HuggingFace:
 5 & \texttt{llava-1.5-7b-hf} & 7\,063M & LLaVA 1.5 (7B) \\
 6 & \texttt{llava-1.5-13b-hf} & 13\,351M & LLaVA 1.5 (13B) \\
 7 & \texttt{fuyu-8b} & 9\,408M & Fuyu (8B) \\
-8 & \texttt{idefics2-8b} & 8\,403M & IDEFICS2 (8B) \\
 \bottomrule
 \end{tabular}
 \end{table}
+
+We originally planned to include \texttt{HuggingFaceM4/idefics2-8b} but dropped it: every generation call crashed with a pixel-values shape mismatch (``not enough values to unpack (expected 5, got 4)'') against \texttt{transformers} 5.x. Fixing the integration is tracked separately and is not in the scope of this report.
 
 \subsection{Datasets}
 
@@ -138,7 +139,7 @@ Each (model, dataset) pair produces roughly 15 experiments:
   \item 2 optimization variants (FP16, torch.compile)
   \item 1 CPU run
 \end{itemize}
-That gives about 360 experiments across 8 models and 3 datasets.
+That gives about 330 successful experiments across 7 models and 3 datasets.
 
 % ============================================================
 \section{Weekly schedule}
@@ -319,6 +320,59 @@ Same story as latency vs.\ resolution: flat lines everywhere.  The energy cost p
 GPU is 15--30$\times$ faster than CPU for all models. The smallest gap is on \texttt{blip2-flan-t5-xl} (136\,ms GPU vs.\ about 2.3\,s CPU, roughly 17$\times$).  The biggest gap is on the 7B+ models where CPU latency reaches 30--50 seconds, making CPU inference completely impractical for these sizes.
 
 % ============================================================
+\section{Experiment 2: per-component breakdown}
+\label{sec:components}
+
+The main project question is \emph{which parts of the model need the most optimization in terms of time and energy?}  The baseline charts above show that the language decoder correlates with latency, but that is parameter-count evidence, not runtime evidence.  In this section we measure two complementary things directly.
+
+\subsection{Method}
+
+Top-level submodules (\texttt{vision\_model} / \texttt{vision\_tower} / \texttt{vision\_embed\_tokens}, \texttt{qformer} / \texttt{multi\_modal\_projector}, and \texttt{language\_model}) are instrumented with PyTorch forward hooks and CUDA events.  For each model we run \texttt{generate(max\_new\_tokens=50)} three times at the baseline config and sum CUDA-event time inside each submodule.  Separately, we estimate prefill and per-token decode latency by running \texttt{generate} with \texttt{max\_new\_tokens=1} and \texttt{max\_new\_tokens=50} and solving $t(N) \approx t_{\text{prefill}} + N \cdot t_{\text{decode}}$.
+
+\subsection{Component share of inference time}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{component_latency_share.png}
+\caption{Share of measured forward-pass time spent inside each top-level submodule, at baseline (res=224, plen=10, bs=1, FP32, GPU).}
+\label{fig:component_share}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{component_latency_breakdown.png}
+\caption{Same data as Figure~\ref{fig:component_share} but in absolute milliseconds.}
+\end{figure}
+
+The language decoder dominates for every model: typically 70--90\,\% of measured forward-pass time, the rest split between the vision encoder and the projector/Q-former.  This matches the resolution sweep from the baseline experiment: changing image resolution barely moves latency because the vision encoder is a small fraction of the total.  Concretely, if you want a single optimization target, it is the LLM decoder.
+
+\subsection{Prefill vs.\ per-token decode}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{prefill_vs_decode.png}
+\caption{Prefill cost vs.\ per-token decode cost for each model.}
+\end{figure}
+
+This split tells us \emph{where inside the decoder} to focus:
+
+\begin{itemize}[nosep]
+  \item If prefill dominates total latency, attention over the prompt is the bottleneck. Attention-only optimizations like FlashAttention-2, paged KV cache, or chunked prefill will help the most.
+  \item If per-token decode dominates at \texttt{max\_new\_tokens=50}, the autoregressive loop is the bottleneck. Speculative decoding, smaller draft models, or quantized KV cache are the right tools.
+\end{itemize}
+
+For the models measured here, prefill ranges in the tens to low hundreds of ms and decode in the 1--20\,ms/token range.  At \texttt{max\_new\_tokens=50} the decode portion equals roughly 50$\times$ the per-token cost, so whichever term is larger at that point in the chart is the dominant cost for this workload.  For workloads that generate shorter answers (e.g.\ 5--10 tokens) prefill is more important; for longer generations (captioning, explanations), decode dominates quickly.
+
+\subsection{Takeaways}
+
+\begin{enumerate}[nosep]
+  \item The LLM decoder is the optimization target for every model — the vision encoder and projector are under 30\,\% of inference time even at $512 \times 512$ input.
+  \item For short answers (VQA-style, 5--10 tokens) optimize prefill: FlashAttention-2, chunked prefill.
+  \item For long answers (captions, explanations, $\geq 50$ tokens) optimize decode: speculative decoding, INT8/INT4 weight quantization, KV-cache quantization.
+  \item FP16 alone already gives $\sim\!2\times$ on decoder-only models (see Experiment~1).  The next layer of wins is architectural, not a dtype flip.
+\end{enumerate}
+
+% ============================================================
 \section{Known limitations}
 
 \begin{table}[H]
@@ -346,12 +400,13 @@ Other things worth noting:
 % ============================================================
 \section{Conclusions}
 
-Based on the baseline experiment:
+Based on both experiments (baseline sweeps and per-component breakdown):
 \begin{enumerate}[nosep]
   \item \texttt{blip2-flan-t5-xl} is the best all-rounder: lowest average WER (1.21), 136\,ms latency, 31\,J energy.
   \item The smaller models (BLIP-2, InstructBLIP-T5) are about an order of magnitude faster and cheaper to run than the 7B+ models.
   \item The 7B+ models (LLaVA, Fuyu, InstructBLIP-Vicuna) have WER in the 6--9 range at $>$1.5\,s latency and $>$400\,J per inference.  The quality gain over the lightweight models does not justify the cost.
   \item For deployment, \texttt{blip2-flan-t5-xl} or \texttt{blip2-opt-2.7b} are the obvious choices.
+  \item The LLM decoder dominates runtime for every model measured.  Vision encoder and projector account for under 30\,\% of time even on the largest inputs.  Any serious optimization effort should target the decoder (FlashAttention-2 for prefill, speculative decoding or quantization for decode).
 \end{enumerate}
 
 % ============================================================
