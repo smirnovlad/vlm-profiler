@@ -21,3 +21,6 @@ results/*__ds=*.json
 
 # slides — track sources, not build artifacts (regenerated via tectonic)
 slides/slides.pdf
+slides/LaTeXTemplates_*.zip
+slides/template.tex
+slides/Images/
