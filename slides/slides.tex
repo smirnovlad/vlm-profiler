@@ -13,6 +13,8 @@
 
 \usepackage{booktabs}
 \usepackage{array}
+\usepackage{tikz}
+\usetikzlibrary{positioning,arrows.meta,fit,backgrounds}
 
 %----------------------------------------------------------------------------------------
 %	THEMES
@@ -154,6 +156,58 @@
 			Ref: \textit{A bicycle replica with a clock as the front wheel.}
 		\end{column}
 	\end{columns}
+\end{frame}
+
+%------------------------------------------------
+
+\begin{frame}
+	\frametitle{VLM architecture in one slide}
+	\framesubtitle{Three families, same skeleton}
+
+	\centering
+	\begin{tikzpicture}[
+		node distance=4mm and 4mm,
+		font=\scriptsize,
+		every node/.style={align=center},
+		box/.style={draw, rounded corners=2pt, minimum height=7mm, minimum width=18mm, fill=blue!7},
+		visbox/.style={box, fill=green!10},
+		bridgebox/.style={box, fill=orange!15},
+		llmbox/.style={box, fill=red!10, minimum width=22mm},
+		arr/.style={-{Latex[length=1.5mm]}, thick},
+		fam/.style={font=\footnotesize\bfseries, anchor=east},
+	]
+
+	% Row 1: BLIP-style
+	\node[fam] (lab1) at (0,0) {BLIP-2 /\\InstructBLIP};
+	\node[visbox, right=8mm of lab1] (v1) {ViT-g/14\\($\sim$300 M)};
+	\node[bridgebox, right=of v1] (q1) {Q-Former\\(106 M)};
+	\node[llmbox, right=of q1] (l1) {OPT / Flan-T5\\(2.7--3 B)};
+	\draw[arr] (v1) -- (q1);
+	\draw[arr] (q1) -- (l1);
+
+	% Row 2: LLaVA-style
+	\node[fam, below=10mm of lab1] (lab2) {LLaVA 1.5};
+	\node[visbox, right=8mm of lab2] (v2) {CLIP ViT-L/14\\(304 M)};
+	\node[bridgebox, right=of v2] (q2) {MLP projector\\(20 M)};
+	\node[llmbox, right=of q2] (l2) {Vicuna / LLaMA\\(7--13 B)};
+	\draw[arr] (v2) -- (q2);
+	\draw[arr] (q2) -- (l2);
+
+	% Row 3: Fuyu (no separate vision tower)
+	\node[fam, below=10mm of lab2] (lab3) {Fuyu-8B};
+	\node[bridgebox, right=8mm of lab3, minimum width=42mm, fill=orange!8] (v3) {linear patch projection\\(image patches → LLM input tokens)};
+	\node[llmbox, right=of v3] (l3) {Persimmon\\(8 B)};
+	\draw[arr] (v3) -- (l3);
+
+	% Group label
+	\node[anchor=south, font=\tiny, gray] at (v1.north) {vision encoder};
+	\node[anchor=south, font=\tiny, gray] at (q1.north) {bridge};
+	\node[anchor=south, font=\tiny, gray] at (l1.north) {LLM decoder};
+
+	\end{tikzpicture}
+
+	\medskip
+	{\scriptsize \textit{Where the parameters live $\to$ where the time lives.} (Foreshadowing the per-component slide.)}
 \end{frame}
 
 %----------------------------------------------------------------------------------------
