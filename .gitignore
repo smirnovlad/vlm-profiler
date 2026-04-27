@@ -19,8 +19,7 @@ efficient_models_papers/
 # results/ holds the report's charts (tracked) but not raw per-run JSONs
 results/*__ds=*.json
 
-# slides — track sources, not build artifacts (regenerated via tectonic)
-slides/slides.pdf
+# slides — track sources and the built PDF; ignore template scratch
 slides/LaTeXTemplates_*.zip
 slides/template.tex
 slides/Images/
