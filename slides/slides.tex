@@ -73,7 +73,7 @@
 
 	Two concrete questions:
 	\begin{enumerate}
-		\item Which models are Pareto-optimal on quality / latency / energy?
+		\item Which model gives the best quality per millisecond and per joule?
 		\item \alert{Which parts of the model dominate cost?}
 	\end{enumerate}
 
@@ -113,8 +113,8 @@
 				\item GPU vs.\ CPU
 			\end{itemize}
 			\smallskip
-			\textbf{Metrics}: latency, FLOPs, energy (J), WER.\\
-			\textbf{Hardware}: 2× RTX 5880 Ada, 48 GiB.
+			\textbf{Metrics}: latency, FLOPs, energy (J), WER ({\scriptsize lower = better}).\\
+			\textbf{Hardware}: 2× RTX 5880 Ada, 48 GB.
 		\end{column}
 	\end{columns}
 \end{frame}
@@ -224,7 +224,7 @@
 			Patch tokens are then mixed inline with text tokens and fed to a standard transformer decoder (Persimmon-8B).
 			\smallskip
 
-			\scriptsize \alert{Consequence:} every image patch joins the KV cache and grows it on every decode step. Why per-token cost is 41 ms despite only 8 B params.
+			\scriptsize \alert{Consequence:} the LLM context is much longer per image. We will see what this costs in the prefill/decode slide.
 		\end{column}
 	\end{columns}
 \end{frame}
@@ -292,7 +292,7 @@
 		\begin{column}{0.5\textwidth}
 			\centering
 			\includegraphics[width=0.95\linewidth,keepaspectratio]{optimization_speedup.png}\\[1mm]
-			\tiny FP16 helps OPT/Vicuna/LLaMA (1.85–2.2×). \emph{Slows} T5. \texttt{torch.compile}: no measurable speedup.
+			\tiny FP16 helps OPT/Vicuna/LLaMA backbones (1.9--2.3×). \emph{Slows} T5. \texttt{torch.compile}: no measurable speedup.
 		\end{column}
 	\end{columns}
 \end{frame}
@@ -342,8 +342,8 @@
 			\textbf{LLM decoder share}
 			\begin{itemize}\setlength\itemsep{0pt}
 				\item BLIP-2 OPT 2.7b: \textbf{74\%}
-				\item BLIP-2 / Instruct-T5: 84–87\%
-				\item vicuna-7b: 98\%, llava: 99\%
+				\item BLIP-2 / Instruct-T5: 84--87\%
+				\item vicuna-7b: 98\%, llava-7b/13b: 99\%
 				\item fuyu-8b: \textbf{99.99\%}
 			\end{itemize}
 
@@ -426,7 +426,7 @@
 
 	\footnotesize
 	\begin{enumerate}\setlength\itemsep{2pt}
-		\item \textbf{For deployment today:} \texttt{blip2-flan-t5-xl} or \texttt{blip2-opt-2.7b}. The 7B+ tier's quality gain does not justify $\sim$15× cost.
+		\item \textbf{For deployment today:} \texttt{blip2-flan-t5-xl} or \texttt{blip2-opt-2.7b}. The 7B+ tier's quality gain does not justify $\sim$13× latency and energy cost.
 		\item \textbf{Optimize the decoder, not the vision tower}, on every model $\geq$ 7B.
 		\item \textbf{Match the optimization to generation length} via $N^*$: short answers → prefill-side (FA2, chunked prefill); long answers → decode-side (speculative, INT8/INT4, KV-cache quant).
 		\item \textbf{FP16 first, attention kernels second.} Dtype flip is a 2–4× lever; FA2 inside FP16 is 1.07–1.11× at short context.
