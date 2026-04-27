@@ -36,7 +36,7 @@
 \subtitle{Performance, energy, and where the time actually goes}
 
 \author[V.\ Smirnov]{Vladislav Smirnov}
-\institute[VLM Profiler]{Project supervisor: Egor (\texttt{@daLime}) \\ \smallskip \textit{github.com/smirnovlad/vlm-profiler}}
+\institute[VLM Profiler]{\textit{github.com/smirnovlad/vlm-profiler}}
 \date[Apr 2026]{April 2026}
 
 %----------------------------------------------------------------------------------------
@@ -74,7 +74,7 @@
 	Two concrete questions:
 	\begin{enumerate}
 		\item Which models are Pareto-optimal on quality / latency / energy?
-		\item \alert{Which parts of the model dominate cost?} (the supervisor's main question)
+		\item \alert{Which parts of the model dominate cost?}
 	\end{enumerate}
 
 	\bigskip
@@ -126,11 +126,13 @@
 \begin{frame}
 	\frametitle{Baseline: two clear tiers}
 
-	\begin{columns}[t]
-		\begin{column}{0.58\textwidth}
-			\includegraphics[width=\textwidth]{quality_vs_latency_by_dataset.png}
+	\begin{columns}[c,onlytextwidth]
+		\begin{column}{0.6\textwidth}
+			\centering
+			\includegraphics[width=\linewidth,keepaspectratio]{quality_vs_latency_by_dataset.png}
 		\end{column}
-		\begin{column}{0.42\textwidth}
+		\begin{column}{0.38\textwidth}
+			\centering
 			\scriptsize
 			\begin{tabular}{@{}lrr@{}}
 				\toprule
@@ -146,14 +148,12 @@
 				instructblip-vicuna-7b  & 1\,793 & 487 \\
 				\bottomrule
 			\end{tabular}
-			\smallskip
 
+			\smallskip
 			\footnotesize
 			\begin{exampleblock}{Pareto winner}
-				\texttt{blip2-flan-t5-xl}: WER 1.21, 136 ms, 31 J.
+				\texttt{blip2-flan-t5-xl}\\WER 1.21, 136 ms, 31 J
 			\end{exampleblock}
-
-			\scriptsize 7B+ tier: 10–15× slower, 6–15× more energy, marginal quality gain.
 		\end{column}
 	\end{columns}
 \end{frame}
@@ -163,13 +163,13 @@
 \begin{frame}
 	\frametitle{Other axes: short version}
 
-	\begin{columns}[t]
+	\begin{columns}[c,onlytextwidth]
 		\begin{column}{0.5\textwidth}
 			\footnotesize
-			\textbf{Resolution 224 → 512:} flat for everyone except Fuyu ($+15\%$ at 512 — raw image patches as text tokens).
+			\textbf{Resolution 224 → 512:} flat everywhere except Fuyu ($+15\%$ at 512 — raw image patches as text tokens).
 			\smallskip
 
-			\textbf{Prompt 10 → 200:} T5 models slow $2{-}3.5\times$; 7B+ decoder-only models barely move.
+			\textbf{Prompt 10 → 200:} T5 slows $2{-}3.5\times$; 7B+ decoder-only barely move.
 			\smallskip
 
 			\textbf{Batch 1 → 8:} small models gain throughput near-linearly; 7B+ scale linearly in \emph{latency} — no throughput gain.
@@ -178,8 +178,9 @@
 			\textbf{CPU vs GPU:} 15–30× gap. Impractical for 7B+.
 		\end{column}
 		\begin{column}{0.5\textwidth}
-			\includegraphics[width=\textwidth]{optimization_speedup.png}\\[1mm]
-			\tiny FP16 helps OPT/Vicuna/LLaMA backbones (1.85–2.2×). \emph{Slows} T5. \texttt{torch.compile}: no measurable speedup.
+			\centering
+			\includegraphics[width=0.95\linewidth,keepaspectratio]{optimization_speedup.png}\\[1mm]
+			\tiny FP16 helps OPT/Vicuna/LLaMA (1.85–2.2×). \emph{Slows} T5. \texttt{torch.compile}: no measurable speedup.
 		\end{column}
 	\end{columns}
 \end{frame}
@@ -219,23 +220,25 @@
 \begin{frame}
 	\frametitle{The punchline: where the time goes}
 
-	\begin{columns}[t]
+	\begin{columns}[c,onlytextwidth]
 		\begin{column}{0.62\textwidth}
-			\includegraphics[width=\textwidth]{component_latency_share.png}
+			\centering
+			\includegraphics[width=\linewidth,keepaspectratio]{component_latency_share.png}
 		\end{column}
-		\begin{column}{0.38\textwidth}
-			\scriptsize Forward hooks + CUDA events on top-level submodules.
-			\smallskip
-
+		\begin{column}{0.36\textwidth}
+			\footnotesize
 			\textbf{LLM decoder share}
 			\begin{itemize}\setlength\itemsep{0pt}
 				\item BLIP-2 OPT 2.7b: \textbf{74\%}
-				\item BLIP-2 / InstructBLIP T5: 84–87\%
+				\item BLIP-2 / Instruct-T5: 84–87\%
 				\item 7B+ models: \textbf{98–99.99\%}
 			\end{itemize}
 
 			\smallskip
-			\alert{\textbf{Optimize the decoder.}} Vision encoder is \emph{not} the bottleneck — explains flat latency-vs-resolution.
+			\scriptsize Forward hooks + CUDA events on top-level submodules.
+
+			\smallskip
+			\alert{\textbf{Optimize the decoder.}}
 		\end{column}
 	\end{columns}
 \end{frame}
@@ -245,22 +248,29 @@
 \begin{frame}
 	\frametitle{Inside the decoder: prefill vs.\ per-token decode}
 
-	\begin{columns}[t]
-		\begin{column}{0.6\textwidth}
-			\includegraphics[width=0.98\textwidth]{prefill_decode_crossover.png}
+	\begin{columns}[c,onlytextwidth]
+		\begin{column}{0.62\textwidth}
+			\centering
+			\includegraphics[width=\linewidth,keepaspectratio]{prefill_decode_crossover.png}
 		\end{column}
-		\begin{column}{0.4\textwidth}
-			\scriptsize
-			$t(N) = t_{\text{prefill}} + N\,t_{\text{decode}}$, fit at $N{=}1, 50$.
+		\begin{column}{0.36\textwidth}
+			\footnotesize
+			$t(N) = t_{\text{prefill}} + N\,t_{\text{decode}}$\\
+			fit at $N{=}1, 50$.
 
+			\smallskip
 			\textbf{Crossover $N^*$:}
 			\begin{itemize}\setlength\itemsep{0pt}
-				\item fuyu-8b 1.6, vicuna-7b 4.1
-				\item llava-13b 5.1, llava-7b 15
-				\item BLIP-2 family 44–54
+				\item fuyu-8b: 1.6
+				\item vicuna-7b: 4.1
+				\item llava-13b: 5.1
+				\item llava-7b: 15
+				\item BLIP-2: 44–54
 			\end{itemize}
 
-			\textbf{Lever:} short ($\leq 10$ tok) → prefill (FA2). Long ($\geq 50$) → decode (spec., KV quant).
+			\smallskip
+			\scriptsize
+			Short → prefill (FA2). Long → decode (spec., KV quant).
 		\end{column}
 	\end{columns}
 \end{frame}
@@ -391,32 +401,26 @@
 
 \begin{frame}
 	\frametitle{Backup: parameter breakdown}
-
-	\begin{center}
-		\includegraphics[width=0.78\textwidth]{param_breakdown.png}
-	\end{center}
-	\footnotesize Language decoder dominates parameter count in every model. Vision encoder $<400$ M. Matches the runtime breakdown.
+	\centering
+	\includegraphics[width=0.7\linewidth,keepaspectratio]{param_breakdown.png}\\[2mm]
+	\footnotesize Language decoder dominates parameter count. Vision encoder $<400$ M. Matches the runtime breakdown.
 \end{frame}
 
 %------------------------------------------------
 
 \begin{frame}
 	\frametitle{Backup: prefill vs.\ decode (absolute)}
-
-	\begin{center}
-		\includegraphics[width=0.82\textwidth]{prefill_vs_decode.png}
-	\end{center}
-	\footnotesize \texttt{llava-1.5-13b} is in FP16 (does not fit in 48 GiB FP32). Re-running 7B in FP16 confirms the dtype flips the ordering — see report Sec.\ 4.
+	\centering
+	\includegraphics[width=0.78\linewidth,keepaspectratio]{prefill_vs_decode.png}\\[2mm]
+	\footnotesize \texttt{llava-1.5-13b} is in FP16 (does not fit in 48 GiB FP32). Re-running 7B in FP16 confirms the dtype flips the ordering.
 \end{frame}
 
 %------------------------------------------------
 
 \begin{frame}
 	\frametitle{Backup: CPU vs GPU}
-
-	\begin{center}
-		\includegraphics[width=0.82\textwidth]{cpu_vs_gpu.png}
-	\end{center}
+	\centering
+	\includegraphics[width=0.78\linewidth,keepaspectratio]{cpu_vs_gpu.png}
 \end{frame}
 
 %----------------------------------------------------------------------------------------
