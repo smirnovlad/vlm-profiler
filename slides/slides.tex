@@ -114,7 +114,9 @@
 			\end{itemize}
 			\smallskip
 			\textbf{Metrics}: latency, FLOPs, energy (J), WER.\\
-			{\scriptsize WER = Word Error Rate, $\frac{\text{insertions + deletions + substitutions}}{\text{reference length}}$. Lower is better; 0 = exact match.}\\
+			{\scriptsize WER $= \frac{\text{insertions + deletions + substitutions}}{\text{reference length}}$.\\
+			Lower is better; 0 = exact match.\\
+			\textit{Example:} ref \texttt{"a red bicycle"}, pred \texttt{"the red bike"} = 2 subs / 3 words → \textbf{WER 0.67}.}\\
 			\textbf{Hardware}: 2× RTX 5880 Ada, 48 GB.
 		\end{column}
 	\end{columns}
