@@ -1,0 +1,315 @@
+{
+  "results": [
+    {
+      "model": "Salesforce/blip2-opt-2.7b",
+      "baseline": {
+        "resolution": 224,
+        "prompt_length": 10,
+        "batch_size": 1,
+        "dataset": "scienceqa"
+      },
+      "component_times": {
+        "per_call_ms": {
+          "vision_model": 5.38042672475179,
+          "qformer": 4.578378836313884,
+          "language_model": 29.055402596791584,
+          "language_projection": 0.03181866556406021
+        },
+        "per_call_share": {
+          "vision_model": 0.13779703499881843,
+          "qformer": 0.11725594660421622,
+          "language_model": 0.744132116903711,
+          "language_projection": 0.0008149014932544724
+        },
+        "total_measured_ms": 39.046026823421315,
+        "wall_ms": 100.1834577570359
+      },
+      "prefill_decode": {
+        "prefill_ms": 48.46256153442624,
+        "decode_per_token_ms": 1.105430954116948,
+        "total_at_50_ms": 103.73410924027364,
+        "short_n": 1,
+        "long_n": 50
+      }
+    },
+    {
+      "model": "Salesforce/blip2-flan-t5-xl",
+      "baseline": {
+        "resolution": 224,
+        "prompt_length": 10,
+        "batch_size": 1,
+        "dataset": "scienceqa"
+      },
+      "component_times": {
+        "per_call_ms": {
+          "vision_model": 5.819050629933675,
+          "qformer": 4.932938575744629,
+          "language_model": 72.43460305531819,
+          "language_projection": 0.03535999978582064
+        },
+        "per_call_share": {
+          "vision_model": 0.06992206349232516,
+          "qformer": 0.059274487580955694,
+          "language_model": 0.870378561035661,
+          "language_projection": 0.00042488789105808754
+        },
+        "total_measured_ms": 83.22195226078232,
+        "wall_ms": 109.4089529166619
+      },
+      "prefill_decode": {
+        "prefill_ms": 51.29954197323647,
+        "decode_per_token_ms": 1.1294703601168936,
+        "total_at_50_ms": 107.77305997908115,
+        "short_n": 1,
+        "long_n": 50
+      }
+    },
+    {
+      "model": "Salesforce/instructblip-flan-t5-xl",
+      "baseline": {
+        "resolution": 224,
+        "prompt_length": 10,
+        "batch_size": 1,
+        "dataset": "scienceqa"
+      },
+      "component_times": {
+        "per_call_ms": {
+          "vision_model": 6.233333428700765,
+          "qformer": 6.786506652832031,
+          "language_model": 68.25906149546306,
+          "language_projection": 0.03815466786424319
+        },
+        "per_call_share": {
+          "vision_model": 0.07665468619438326,
+          "qformer": 0.08345735773312618,
+          "language_model": 0.8394187474018108,
+          "language_projection": 0.0004692086706797736
+        },
+        "total_measured_ms": 81.3170562448601,
+        "wall_ms": 108.39329070101182
+      },
+      "prefill_decode": {
+        "prefill_ms": 51.24889335081893,
+        "decode_per_token_ms": 0.946754070163584,
+        "total_at_50_ms": 98.58659685899813,
+        "short_n": 1,
+        "long_n": 50
+      }
+    },
+    {
+      "model": "Salesforce/instructblip-vicuna-7b",
+      "baseline": {
+        "resolution": 224,
+        "prompt_length": 10,
+        "batch_size": 1,
+        "dataset": "scienceqa"
+      },
+      "component_times": {
+        "per_call_ms": {
+          "vision_model": 5.82587734858195,
+          "qformer": 5.8483091990153,
+          "language_model": 473.93284098307294,
+          "language_projection": 0.030570666616161663
+        },
+        "per_call_share": {
+          "vision_model": 0.011996347420809118,
+          "qformer": 0.012042537935128063,
+          "language_model": 0.9758981650974676,
+          "language_projection": 6.294954659532473e-05
+        },
+        "total_measured_ms": 485.6375981972863,
+        "wall_ms": 1774.259887014826
+      },
+      "prefill_decode": {
+        "prefill_ms": 135.0342784976574,
+        "decode_per_token_ms": 32.74772890849786,
+        "total_at_50_ms": 1772.4207239225507,
+        "short_n": 1,
+        "long_n": 50
+      }
+    },
+    {
+      "model": "llava-hf/llava-1.5-7b-hf",
+      "baseline": {
+        "resolution": 224,
+        "prompt_length": 10,
+        "batch_size": 1,
+        "dataset": "scienceqa"
+      },
+      "component_times": {
+        "per_call_ms": {
+          "vision_tower": 6.0406308855329245,
+          "multi_modal_projector": 0.16372571459838323,
+          "language_model": 852.7413281032017
+        },
+        "per_call_share": {
+          "vision_tower": 0.007032611017330238,
+          "multi_modal_projector": 0.0001906124188224214,
+          "language_model": 0.9927767765638473
+        },
+        "total_measured_ms": 858.945684703333,
+        "wall_ms": 879.3651615934713
+      },
+      "prefill_decode": {
+        "prefill_ms": 105.3622093963988,
+        "decode_per_token_ms": 15.559744983151251,
+        "total_at_50_ms": 883.3494585539613,
+        "short_n": 1,
+        "long_n": 50
+      },
+      "optimization": "fp16",
+      "attn_impl": "eager"
+    },
+    {
+      "model": "llava-hf/llava-1.5-13b-hf",
+      "baseline": {
+        "resolution": 224,
+        "prompt_length": 10,
+        "batch_size": 1,
+        "dataset": "scienceqa"
+      },
+      "component_times": {
+        "per_call_ms": {
+          "vision_tower": 4.709792137145996,
+          "multi_modal_projector": 0.07268266628185908,
+          "language_model": 707.394858042399
+        },
+        "per_call_share": {
+          "vision_tower": 0.0066132294864340736,
+          "multi_modal_projector": 0.00010205697784766975,
+          "language_model": 0.9932847135357183
+        },
+        "total_measured_ms": 712.1773328458269,
+        "wall_ms": 1860.7671369488041
+      },
+      "prefill_decode": {
+        "prefill_ms": 169.4608052470246,
+        "decode_per_token_ms": 33.49251412868905,
+        "total_at_50_ms": 1844.0865116814773,
+        "short_n": 1,
+        "long_n": 50
+      }
+    },
+    {
+      "model": "adept/fuyu-8b",
+      "baseline": {
+        "resolution": 224,
+        "prompt_length": 10,
+        "batch_size": 1,
+        "dataset": "scienceqa"
+      },
+      "component_times": {
+        "per_call_ms": {
+          "vision_embed_tokens": 0.033013333566486835,
+          "language_model": 468.54188601175946
+        },
+        "per_call_share": {
+          "vision_embed_tokens": 7.045476318217588e-05,
+          "language_model": 0.9999295452368179
+        },
+        "total_measured_ms": 468.57489934532595,
+        "wall_ms": 2113.025299894313
+      },
+      "prefill_decode": {
+        "prefill_ms": 64.67444815856666,
+        "decode_per_token_ms": 40.73996258405398,
+        "total_at_50_ms": 2101.6725773612657,
+        "short_n": 1,
+        "long_n": 50
+      }
+    },
+    {
+      "model": "llava-hf/llava-1.5-13b-hf",
+      "baseline": {
+        "resolution": 224,
+        "prompt_length": 10,
+        "batch_size": 1,
+        "dataset": "scienceqa"
+      },
+      "component_times": {
+        "per_call_ms": {
+          "vision_tower": 6.07741253716605,
+          "multi_modal_projector": 0.2642331378800528,
+          "language_model": 1849.0556896754674
+        },
+        "per_call_share": {
+          "vision_tower": 0.0032755315647890223,
+          "multi_modal_projector": 0.0001424132356157206,
+          "language_model": 0.9965820551995953
+        },
+        "total_measured_ms": 1855.3973353505135,
+        "wall_ms": 1883.722364503358
+      },
+      "prefill_decode": {
+        "prefill_ms": 181.29163226737225,
+        "decode_per_token_ms": 34.20313163701195,
+        "total_at_50_ms": 1891.4482141179699,
+        "short_n": 1,
+        "long_n": 50
+      },
+      "optimization": "fp16",
+      "attn_impl": "eager"
+    },
+    {
+      "model": "llava-hf/llava-1.5-7b-hf",
+      "baseline": {
+        "resolution": 224,
+        "prompt_length": 10,
+        "batch_size": 1,
+        "dataset": "scienceqa"
+      },
+      "component_times": {
+        "per_call_ms": {
+          "vision_tower": 16.30874933515276,
+          "multi_modal_projector": 0.7478902850832257,
+          "language_model": 1844.1666385105677
+        },
+        "per_call_share": {
+          "vision_tower": 0.008762381991875458,
+          "multi_modal_projector": 0.00040182727879608285,
+          "language_model": 0.9908357907293285
+        },
+        "total_measured_ms": 1861.2232781308037,
+        "wall_ms": 1894.48623133025
+      },
+      "prefill_decode": {
+        "prefill_ms": 441.5179647548727,
+        "decode_per_token_ms": 29.507898508351158,
+        "total_at_50_ms": 1916.9128901724305,
+        "short_n": 1,
+        "long_n": 50
+      }
+    },
+    {
+      "model": "llava-hf/llava-1.5-7b-hf",
+      "baseline": {
+        "resolution": 224,
+        "prompt_length": 10,
+        "batch_size": 1,
+        "dataset": "scienceqa"
+      },
+      "component_times": {
+        "per_call_ms": {
+          "vision_tower": 4.756155490875244,
+          "multi_modal_projector": 0.17396114127976553,
+          "language_model": 828.3926486968994
+        },
+        "per_call_share": {
+          "vision_tower": 0.005707458968791258,
+          "multi_modal_projector": 0.00020875601689709442,
+          "language_model": 0.9940837850143117
+        },
+        "total_measured_ms": 833.3227653290544,
+        "wall_ms": 853.836160818381
+      },
+      "prefill_decode": {
+        "prefill_ms": 93.76073567299905,
+        "decode_per_token_ms": 15.373730980424597,
+        "total_at_50_ms": 862.4472846942289,
+        "short_n": 1,
+        "long_n": 50
+      },
+      "optimization": "fp16"
+    }
+  ]
+}

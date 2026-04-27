@@ -64,6 +64,22 @@
 
 ![CPU vs GPU Latency](cpu_vs_gpu.png)
 
+## Per-Component Share of Inference Time
+
+![Per-Component Share of Inference Time](component_latency_share.png)
+
+## Per-Component Latency Breakdown (ms)
+
+![Per-Component Latency Breakdown (ms)](component_latency_breakdown.png)
+
+## Prefill vs Per-Token Decode Cost
+
+![Prefill vs Per-Token Decode Cost](prefill_vs_decode.png)
+
+## Prefill vs Decode Crossover by Generation Length
+
+![Prefill vs Decode Crossover by Generation Length](prefill_decode_crossover.png)
+
 ## Known Limitations
 
 ### Model-specific incompatibilities

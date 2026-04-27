@@ -212,4 +212,4 @@ Phases 1, 2, 3 can be developed in parallel since they are independent modules.
 
 ---
 
-**WAITING FOR CONFIRMATION**: Proceed with this plan? (yes / no / modify)
+_This is the original implementation plan, kept for transparency. See `README.md` and `report.pdf` for the actual outcome and known deviations._

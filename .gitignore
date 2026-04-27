@@ -5,10 +5,16 @@ __pycache__/
 dist/
 build/
 .eggs/
+.pytest_cache/
+.claude/
+torchinductor_*/
+
 data_cache/
-results/
-reports/
 outputs/
 wandb/
+efficient_models_papers/
 *.log
 .env
+
+# results/ holds the report's charts (tracked) but not raw per-run JSONs
+results/*__ds=*.json

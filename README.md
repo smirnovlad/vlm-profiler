@@ -82,27 +82,22 @@ python scripts/generate_report.py --outputs-root outputs/2026-03-27 --report-dir
 Compile PDF report:
 ```bash
 cd latex_report && tectonic report.tex
+mv report.pdf ../report.pdf
 ```
 
-## Current status
+## Status
 
-**Done:**
-- Full profiling pipeline (latency, FLOPs, energy, quality)
-- 7 models tested across 3 datasets, ~330 successful experiments
-- Report with 10 charts and per-chart analysis
-- PDF report ready for submission
+- Full profiling pipeline (latency, FLOPs, energy, quality) on 7 models × 3 datasets, ~330 successful experiments.
+- Per-component latency breakdown (vision encoder / projector / LLM decoder) via forward hooks + CUDA events.
+- Prefill vs. per-token decode split with crossover analysis.
+- FlashAttention-2 vs. eager attention A/B (via SDPA dispatch on Ada).
+- Report at [`report.pdf`](report.pdf), markdown summary at [`results/REPORT.md`](results/REPORT.md).
 
-**Known issues:**
-- fuyu-8b: FP16 broken (dtype mismatch), batching broken (processor returns lists)
-- T5-based models: torch.compile fails, FP16 adds overhead instead of speedup
-
-## Planned
-
-- Add FlashAttention-2 experiments for compatible models
-- Per-component latency breakdown (vision encoder vs LLM backbone vs cross-attention)
-- Test additional models (moondream2, cogagent-vqa-hf) that were dropped due to compatibility issues
-- Throughput analysis (tokens/second) alongside latency
-- Quantization experiments (INT8, GPTQ)
+**Known incompatibilities (documented in report):**
+- `idefics2-8b`: pixel-values shape mismatch on transformers 5.x — dropped from results.
+- `fuyu-8b`: FP16 dtype mismatch; processor doesn't support batched inputs.
+- T5-based models: `torch.compile` fails; FP16 adds dtype-cast overhead instead of speedup.
+- `flash-attn` pip package requires nvcc ≥ 11.7; system has 11.5 — used SDPA-FA2 dispatch instead.
 
 ## Hardware
 
