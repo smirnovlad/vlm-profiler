@@ -13,8 +13,6 @@
 
 \usepackage{booktabs}
 \usepackage{array}
-\usepackage{tikz}
-\usetikzlibrary{positioning,arrows.meta,fit,backgrounds}
 
 %----------------------------------------------------------------------------------------
 %	THEMES
@@ -161,53 +159,74 @@
 %------------------------------------------------
 
 \begin{frame}
-	\frametitle{VLM architecture in one slide}
-	\framesubtitle{Three families, same skeleton}
+	\frametitle{Architecture: BLIP-2 / InstructBLIP}
 
-	\centering
-	\begin{tikzpicture}[
-		node distance=4mm and 4mm,
-		font=\scriptsize,
-		every node/.style={align=center},
-		box/.style={draw, rounded corners=2pt, minimum height=7mm, minimum width=18mm, fill=blue!7},
-		visbox/.style={box, fill=green!10},
-		bridgebox/.style={box, fill=orange!15},
-		llmbox/.style={box, fill=red!10, minimum width=22mm},
-		arr/.style={-{Latex[length=1.5mm]}, thick},
-		fam/.style={font=\footnotesize\bfseries, anchor=east},
-	]
+	\begin{columns}[c,onlytextwidth]
+		\begin{column}{0.66\textwidth}
+			\centering
+			\includegraphics[width=\linewidth,keepaspectratio]{arch_instructblip.png}
+		\end{column}
+		\begin{column}{0.32\textwidth}
+			\footnotesize
+			\textbf{ViT-g/14} (frozen, $\sim$300 M)\\
+			$\downarrow$\\
+			\textbf{Q-Former} (106 M trainable)\\
+			cross-attention compresses image features into 32 query tokens\\
+			$\downarrow$\\
+			\textbf{LLM} (frozen, OPT-2.7B or Flan-T5-XL)
+			\smallskip
 
-	% Row 1: BLIP-style
-	\node[fam] (lab1) at (0,0) {BLIP-2 /\\InstructBLIP};
-	\node[visbox, right=8mm of lab1] (v1) {ViT-g/14\\($\sim$300 M)};
-	\node[bridgebox, right=of v1] (q1) {Q-Former\\(106 M)};
-	\node[llmbox, right=of q1] (l1) {OPT / Flan-T5\\(2.7--3 B)};
-	\draw[arr] (v1) -- (q1);
-	\draw[arr] (q1) -- (l1);
+			\scriptsize \textit{InstructBLIP} adds the instruction text as extra context to the Q-Former.
+		\end{column}
+	\end{columns}
+\end{frame}
 
-	% Row 2: LLaVA-style
-	\node[fam, below=10mm of lab1] (lab2) {LLaVA 1.5};
-	\node[visbox, right=8mm of lab2] (v2) {CLIP ViT-L/14\\(304 M)};
-	\node[bridgebox, right=of v2] (q2) {MLP projector\\(20 M)};
-	\node[llmbox, right=of q2] (l2) {Vicuna / LLaMA\\(7--13 B)};
-	\draw[arr] (v2) -- (q2);
-	\draw[arr] (q2) -- (l2);
+%------------------------------------------------
 
-	% Row 3: Fuyu (no separate vision tower)
-	\node[fam, below=10mm of lab2] (lab3) {Fuyu-8B};
-	\node[bridgebox, right=8mm of lab3, minimum width=42mm, fill=orange!8] (v3) {linear patch projection\\(image patches → LLM input tokens)};
-	\node[llmbox, right=of v3] (l3) {Persimmon\\(8 B)};
-	\draw[arr] (v3) -- (l3);
+\begin{frame}
+	\frametitle{Architecture: LLaVA 1.5}
 
-	% Group label
-	\node[anchor=south, font=\tiny, gray] at (v1.north) {vision encoder};
-	\node[anchor=south, font=\tiny, gray] at (q1.north) {bridge};
-	\node[anchor=south, font=\tiny, gray] at (l1.north) {LLM decoder};
+	\begin{columns}[c,onlytextwidth]
+		\begin{column}{0.62\textwidth}
+			\centering
+			\includegraphics[width=\linewidth,keepaspectratio]{arch_llava.png}
+		\end{column}
+		\begin{column}{0.36\textwidth}
+			\footnotesize
+			\textbf{CLIP ViT-L/14} (304 M)\\
+			produces 576 patch tokens for a 336$\times$336 image\\
+			$\downarrow$\\
+			\textbf{MLP adapter} ($\sim$20 M)\\
+			2-layer projection into the LLM hidden size\\
+			$\downarrow$\\
+			\textbf{LLaMA / Vicuna} (7B or 13B)
+			\smallskip
 
-	\end{tikzpicture}
+			\scriptsize Image and text tokens are concatenated and fed into the LLM as one sequence.
+		\end{column}
+	\end{columns}
+\end{frame}
 
-	\medskip
-	{\scriptsize \textit{Where the parameters live $\to$ where the time lives.} (Foreshadowing the per-component slide.)}
+%------------------------------------------------
+
+\begin{frame}
+	\frametitle{Architecture: Fuyu-8B}
+
+	\begin{columns}[c,onlytextwidth]
+		\begin{column}{0.66\textwidth}
+			\centering
+			\includegraphics[width=\linewidth,keepaspectratio]{arch_fuyu.png}
+		\end{column}
+		\begin{column}{0.32\textwidth}
+			\footnotesize
+			\textbf{No separate vision tower.}\\
+			Image is split into 30$\times$30 patches; each patch goes through a single linear projection into the LLM hidden size.\\[1mm]
+			Patch tokens are then mixed inline with text tokens and fed to a standard transformer decoder (Persimmon-8B).
+			\smallskip
+
+			\scriptsize \alert{Consequence:} every image patch joins the KV cache and grows it on every decode step. Why per-token cost is 41 ms despite only 8 B params.
+		\end{column}
+	\end{columns}
 \end{frame}
 
 %----------------------------------------------------------------------------------------
