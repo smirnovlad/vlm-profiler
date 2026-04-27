@@ -168,9 +168,9 @@
 		\end{column}
 		\begin{column}{0.32\textwidth}
 			\footnotesize
-			\textbf{ViT-g/14} (frozen, $\sim$300 M)\\
+			\textbf{EVA ViT-g/14} (frozen, $\sim$1 B)\\
 			$\downarrow$\\
-			\textbf{Q-Former} (106 M trainable)\\
+			\textbf{Q-Former} (105 M trainable)\\
 			cross-attention compresses image features into 32 query tokens\\
 			$\downarrow$\\
 			\textbf{LLM} (frozen, OPT-2.7B or Flan-T5-XL)
@@ -264,6 +264,8 @@
 			\begin{exampleblock}{Pareto winner}
 				\texttt{blip2-flan-t5-xl}\\WER 1.21, 136 ms, 31 J
 			\end{exampleblock}
+
+			\scriptsize 7B+ tier: $\sim$13× slower, $\sim$13× more energy.
 		\end{column}
 	\end{columns}
 \end{frame}
@@ -276,16 +278,16 @@
 	\begin{columns}[c,onlytextwidth]
 		\begin{column}{0.5\textwidth}
 			\footnotesize
-			\textbf{Resolution 224 → 512:} flat everywhere except Fuyu ($+15\%$ at 512 — raw image patches as text tokens).
+			\textbf{Resolution 224 → 512:} flat everywhere except Fuyu ($+20\%$ at 512 — raw image patches as text tokens).
 			\smallskip
 
-			\textbf{Prompt 10 → 200:} T5 slows $2{-}3.5\times$; 7B+ decoder-only barely move.
+			\textbf{Prompt 10 → 200:} T5 slows $2.3{-}3.5\times$; 7B+ decoder-only $\leq 16\%$.
 			\smallskip
 
-			\textbf{Batch 1 → 8:} small models gain throughput near-linearly; 7B+ scale linearly in \emph{latency} — no throughput gain.
+			\textbf{Batch 1 → 8:} all models gain throughput, but sub-linearly. Best: instruct-T5 / vicuna-7b at $\sim 4\times$. Worst: llava-7b at $\sim 2\times$.
 			\smallskip
 
-			\textbf{CPU vs GPU:} 15–30× gap. Impractical for 7B+.
+			\textbf{CPU vs GPU:} 19–30× gap. Impractical for 7B+.
 		\end{column}
 		\begin{column}{0.5\textwidth}
 			\centering
@@ -341,7 +343,8 @@
 			\begin{itemize}\setlength\itemsep{0pt}
 				\item BLIP-2 OPT 2.7b: \textbf{74\%}
 				\item BLIP-2 / Instruct-T5: 84–87\%
-				\item 7B+ models: \textbf{98–99.99\%}
+				\item vicuna-7b: 98\%, llava: 99\%
+				\item fuyu-8b: \textbf{99.99\%}
 			\end{itemize}
 
 			\smallskip
